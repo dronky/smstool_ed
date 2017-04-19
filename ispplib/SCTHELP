@@ -1,0 +1,17 @@
+)body
+%-----------------------  SMS CONTROL TOOL HELP  ------------------------------
++                                                           +
++ This tool provides sms disk functions for system          +
++ programmer.                                               +
++ You can:                                                  +
++ *Dynamically add or remove disks from group.              +
++ *Dynamically set sms status (qscnew/enabled) and copy     +
++  datasets from quiesced volumes.                          +
++ *Make disks online/offline at several systems.            +
++                                                           +
++                                                           +
++                                                           +
++                                                           +
+)INIT
+)PROC
+)end

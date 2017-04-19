@@ -1,0 +1,20 @@
+)body window(61,20)
+%-----------------------  SMS CONTROL TOOL HELP  ------------
++                            SMS STATUS TOOL                +
++                                                           +
++                                                           +
++ Set status:                                               +
++ Specify volume (e.g. Z1DBMR), group and desired status.   +
++  and press enter.                                         +
++                                                           +
++ [C]opy data sets from quiesced volume:                    +
++ Specify volume and group. After all checks complete, it   +
++ will submit ADRSSU copy job                               +
++                                                           +
++ To list group disks specify group name and prees enter    +
++                                                           +
++                                                           +
++                                                           +
+)INIT
+)PROC
+)end

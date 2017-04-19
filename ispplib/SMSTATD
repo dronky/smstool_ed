@@ -1,0 +1,68 @@
+)ATTR
+_ TYPE(INPUT) INTENS(HIGH) COLOR(TURQ) HILITE(USCORE)
+% TYPE(TEXT) INTENS(LOW) SKIP(ON)
++ TYPE(TEXT) INTENS(HIGH) SKIP(ON) PAD(_)
+)BODY
+%-----------------------------  DISPLAY SMS  -----------------------------------
++                                                                              +
++ SELECT OPTION:                                            +
++ [On]line                                                  +
++ [Off]line                                                 +
++ 0.Back to prev menu                                       +
++                                                           +
+% SELECT      ===>_ST     %
+% FOR SYSTEMS ===>_SYST                                     %+ Blank = current +
+% FOR DISKS   ===>_DISK
+                                                                               %
+)INIT
+.CURSOR = ST
+)PROC
+IF (&ST NE '0' & &ST NE 'EXIT' & &SYST NE 'EXIT' & &DISK NE 'EXIT')
+  *REXX(ST,DISK,SYST)
+  TEMPDS='a09.TMP'
+  "ALLOC DA('"TEMPDS"') F(OUTDD) NEW       "
+  "NEWSTACK"
+  queue "//SMSTAT   JOB A09,MAKARENKO,NOTIFY=&SYSUID,MSGCLASS=X"
+  queue "//STEP1    EXEC PGM=IEBGENER"
+  queue "//SYSUT1   DD *,DLM=@@"
+  queue "/*REXX SMSTAT*/"
+  queue "ARG  COMMAND"
+  queue "COMMAND = 'v ("DISK"),"ST"'"
+  queue "IF ISFCALLS('ON') <> 0 THEN EXIT 99"
+  queue "ADDRESS SDSF "'"ISFEXEC '"'/"'"COMMAND"'"'"' (WAIT"'""
+  queue "DO I=1 TO  ISFULOG.0"
+  queue "SAY  ISFULOG.I"
+  queue "END"
+  queue "CALL ISFCALLS 'OFF'"
+  queue "EXIT 0"
+  queue "@@"
+  queue "//SYSUT2   DD DSN=&&PDS(PROG1),DISP=(,PASS),UNIT=VIO,"
+  queue "//         SPACE=(CYL,(1,1,1),RLSE)"
+  queue "//SYSPRINT DD SYSOUT=*"
+  queue "//SYSIN    DD DUMMY"
+  queue "//*"
+  queue "//STEP2    EXEC PGM=IRXJCL,PARM='PROG1'"
+  queue "//SYSEXEC  DD DSN=&&PDS,DISP=(OLD,PASS)"
+  queue "//SYSTSPRT DD SYSOUT=*"
+  queue "//SYSTSIN  DD DUMMY"
+  queue "//*"
+  "EXECIO * DISKW OUTDD (FINIS"
+  "DELSTACK"
+  /*splitting systems string into stems*/
+  do i = 1 by 1 while syst <> ''
+    parse var syst sysmass.i ',' syst
+  end
+  sysmass.0 = i-1
+  /*FTPSUB PROC FOR EXEC PREVIOUS CODE ON MULTIPLE SYSTEMS*/
+  queue "//SMSFTP   JOB A09,MAK,NOTIFY=&SYSUID,MSGCLASS=X"
+  queue "//STEP01   EXEC PGM=IEFBR14"
+  queue "//SYSPRINT DD SYSOUT=*"
+  do i=1 to sysmass.0
+  queue "// S FTPSUB,SYS="SYSMASS.I",DS='"TEMPDS"'"
+  end
+  queue "$$"
+  "submit * end($$)"
+  /*Free for delete DS*/
+  "FREE F(OUTDD)"
+  *ENDREXX
+)END

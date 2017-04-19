@@ -1,0 +1,74 @@
+)body
+%---------------------------  SMS STATUS  ---------------------------------
+% Option  ===>_ZCMD  +
++ [0]Back to prev menu                                        +
++ [C]Copy ds to other disks                                   +
+% VOLUME .... _VOL   +
+% GROUP ..... _GRP       +
+% STATUS .... _ST     +[QNEW(Q) OR ENABLED(E)]
++                                                             +
++                                                             +
++ CURRENT TEMPDS ......... &TEMPDS                            +
++                                                             +
++ NOTE: JOB MAY END WITH 4, CAUSE IT CANT MOVE VTOC DATASETS  +
+)INIT
+.CURSOR = ZCMD
+&STAT=''
+&ARGS = ""
+&TEMPDS='A09.TMP'
+/* MODE - PARM FOR CHECK CURRENT DISK OR ANOTHER (0-CURRENT, 1-ANOTHER) */
+&MODE=1
+)PROC
+&ZSEL = TRANS(&ZCMD
+            C,'SMSC'
+            0,'0')
+IF (VER (&GRP,NB) & &VOL EQ '' & &ST EQ '')
+  &ARGS = 'd sms,storgrp(&GRP),LISTVOL'
+  *REXX(ARGS,(DIP#))
+ 
+ELSE
+IF (VER (&VOL,NB) & VER (&ST,NB) & &ZCMD EQ '')
+  *REXX(VOL,ST,(VOLSTAT#))
+ 
+ELSE
+IF (VER (&VOL,NB) & &ST EQ '' & VER (&GRP,NB) & &ZCMD EQ 'C')
+  *REXX(GRP,VOL,STAT,(CHKVOL#)) /* CHECK IF VOL EXIST IN GROUP */
+  IF (&STAT  = 'OK')
+    &STAT = ''
+    *REXX(GRP,VOL,STAT,(CHKVOL2#)) /* CHECK IF VOL HAVE UNIT */
+    IF (&STAT  = 'NOT FOUND') /* NOT FOUND MEAN 'NOT FOUND VOL WITH FREE UNIT' */
+      &STAT = ''
+      *REXX(VOL,STAT,(CHKQSC#)) /* CHECK IF VOLUME QUIESCED AT ALL SYSTEMS */
+      IF (&STAT = 'OK')
+        &STAT = ''
+        *REXX(GRP,VOL,STAT,MODE,(CHKENB#)) /* CHECK IF OTHER DISKS IN GROUP IS ENABLED */
+        IF (&STAT = 'OK')
+          &STAT = ''
+          *REXX(VOL,GRP,TEMPDS)
+          SAY VOL ' FOUND IN ' GRP
+          CALL JCLCPY# TEMPDS VOL /* MAY INVOKE ERRORS IF SDSF IS ACTIVE */
+          ADDRESS TSO "SUBMIT '"TEMPDS"'"
+          *ENDREXX
+        ELSE
+          *REXX(VOL,GRP)
+          SAY VOL ' FOUND IN ' GRP ', UNIT DEFINED, QUIESCED ON ALL SYSTEMS, BUT NOT ENABLED DISKS IN GROUP '
+          *ENDREXX
+      ELSE
+        *REXX(VOL,GRP)
+        SAY VOL ' FOUND IN ' GRP ', UNIT DEFINED, BUT NOT QUIESCED ON ALL SYSTEMS '
+        *ENDREXX
+    ELSE
+      *REXX(VOL,GRP)
+      SAY VOL ' FOUND IN ' GRP ', BUT NOT DEFINED UNIT '
+      *ENDREXX
+  ELSE
+    *REXX(VOL,GRP)
+    SAY 'CANT FIND ' VOL ' IN ' GRP
+    *ENDREXX
+/*&GRP=''*/
+)HELP
+FIELD(ZCMD)   PANEL(HSMSVOL)
+FIELD(VOL)    PANEL(HSMSVOL)
+FIELD(GROUP)  PANEL(HSMSVOL)
+FIELD(ST)     PANEL(HSMSVOL)
+)end

@@ -1,0 +1,99 @@
+)ATTR
+_ TYPE(INPUT) INTENS(HIGH) COLOR(TURQ) HILITE(USCORE)
+% TYPE(TEXT) INTENS(LOW) SKIP(ON)
++ TYPE(TEXT) INTENS(HIGH) SKIP(ON) PAD(_)
+)BODY
+%-----------------------------  DISPLAY SMS  -----------------------------------
++                                                                              +
++ SELECT OPTION:                                            +
++ [On]line                                                  +
++ [Off]line                                                 +
++ 0.Back to prev menu                                       +
++                                                           +
+% SELECT      ===>_ST     %
+% FOR SYSTEMS ===>_SYST                                     %+ Blank = current +
+% EXCLUDE     ===>_EXC                                      %+
+% FOR DISKS   ===>_DISK
+                                                                               %
+)INIT
+.CURSOR = ST
+)PROC
+IF (&ST NE '0' & &ST NE 'EXIT' & &SYST NE 'EXIT' & &DISK NE 'EXIT')
+  *REXX(ST,DISK,SYST)
+  SYSDS='A09.SYS'
+  TEMPDS='A09.TMP'
+  if ST = 'OFF' ! ST = 'OF' then
+  do
+    ST='OFFLINE'
+  end
+  if ST = 'ON' then
+  do
+    ST = 'ONLINE'
+  end
+  /*Delete tempds if exist*/
+  if sysdsn("'"TEMPDS"'")='OK' THEN
+    ADDRESS TSO "DELETE '"TEMPDS"'"
+  /*making new DS for jcl*/
+  "ALLOC DA('"TEMPDS"') F(OUTDD) NEW "
+  "NEWSTACK"
+  queue "//SMSTAT   JOB A09,MAKARENKO,NOTIFY=&SYSUID,MSGCLASS=X"
+  queue "//STEP1    EXEC PGM=IEBGENER"
+  queue "//SYSUT1   DD *,DLM=@@"
+  queue "/*REXX SMSTAT*/"
+  queue "ARG  COMMAND"
+  queue "COMMAND = 'v ("DISK"),"ST"'"
+  queue "IF ISFCALLS('ON') <> 0 THEN EXIT 99"
+  queue "ADDRESS SDSF "'"ISFEXEC '"'/"'"COMMAND"'"'"' (WAIT"'""
+  queue "DO I=1 TO  ISFULOG.0"
+  queue "SAY  ISFULOG.I"
+  queue "END"
+  queue "CALL ISFCALLS 'OFF'"
+  queue "EXIT 0"
+  queue "@@"
+  queue "//SYSUT2   DD DSN=&&PDS(PROG1),DISP=(,PASS),UNIT=VIO,"
+  queue "//         SPACE=(CYL,(1,1,1),RLSE)"
+  queue "//SYSPRINT DD SYSOUT=*"
+  queue "//SYSIN    DD DUMMY"
+  queue "//*"
+  queue "//STEP2    EXEC PGM=IRXJCL,PARM='PROG1'"
+  queue "//SYSEXEC  DD DSN=&&PDS,DISP=(OLD,PASS)"
+  queue "//SYSTSPRT DD SYSOUT=*"
+  queue "//SYSTSIN  DD DUMMY"
+  queue "//*"
+  "EXECIO * DISKW OUTDD (FINIS"
+  "DELSTACK"
+  ADDRESS SYSCALL 'sleep 1'
+  "FREE F(OUTDD)"
+  /*Checking systems*/
+  if syst='' then do /*read system list file*/
+  "ALLOC FI(INPUTDD) DA('"SYSDS"') F( SHR REUSE"
+  "EXECIO * DISKR INPUTDD (STEM SYSL. FINIS" /* EXECIO reads record 4 */
+  "FREE FI(INPUTDD)"
+  ELSE
+  /*splitting systems string into stems*/
+  do i = 1 by 1 while syst <> ''
+    parse var syst sysmass.i ',' syst
+  end
+  sysmass.0 = i-1
+  /*IF SYSTEMS EXCLUDED*/
+  chk=0
+  DO i = 1 to sysmass.0
+  IF LEFT(SYSMASS.I,1)='!' then
+  DO
+  chk=chk+1
+  END
+  /*FTPSUB PROC FOR EXEC PREVIOUS CODE ON MULTIPLE SYSTEMS*/
+  "CONSOLE ACTIVATE"
+  ADDRESS CONSOLE
+  "CART SYSCMD01"
+  do i = 1 to sysmass.0
+    COMMAND="S FTPSUB,SYS="SYSMASS.i",DS='"TEMPDS"'"
+    INTERPRET '"'COMMAND'"'
+    CR = GETMSG('SYSRESP.','SOL','SYSCMD01',,5)
+  end
+  ADDRESS TSO
+  "CONSOLE DEACTIVATE"
+
+  /*DELETE DS*/
+  *ENDREXX
+)END

@@ -1,0 +1,18 @@
+)body window(61,20)
+%-----------------------  SMS CONTROL TOOL HELP  ------------
++                            SMS ON/OFF TOOL                +
++                                                           +
++                                                           +
++ You can vary disks at single or multiple systems:         +
++ Select [ON]line or [OFF]line.                             +
++ Specify Systems.                                          +
++ Example: !SYS2 - vary disk at all systems, excluding SYS2;+
++  SYS1,EP01 - vary only at SYS1 AND EP01;                  +
++  *BLANK* - vary at all systems.                           +
++ Specify disk unit(s), delimited with ','                  +
++ Prees enter.                                              +
++                                                           +
++                                                           +
+)INIT
+)PROC
+)end

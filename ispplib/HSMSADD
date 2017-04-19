@@ -1,0 +1,20 @@
+)body window(61,30)
+%-----------------------  SMS CONTROL TOOL HELP  ------------
++                        SMS ADD/REMOVE DISK TOOL           +
++                                                           +
++                                                           +
++ Add volume:                                               +
++ 1) You can list group disks [L] or straightway [F]ind     +
++   free disk in sms group. (type group name only)          +
++ 2) After we selected group, free volume, we need to set   +
++   size. (default will be 9gb)                             +
++ 3) [A]dd disk. Tool will vary offline disks at all systems+
++   while initialization process, vary online after complete+
++                                                           +
++ Delete volume:                                            +
++ 1) Specify VOL and GROUP, which you want to delete        +
++                                                           +
++                                                           +
+)INIT
+)PROC
+)end

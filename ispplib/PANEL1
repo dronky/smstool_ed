@@ -1,0 +1,32 @@
+)body
+%-------------------------  SMS CONTROL TOOL  ----------------------------------
++                                 &ZDATE                    +
++                    WELCOME TO THE SMS CONTROL TOOL        +
++ Select option for continue                                +
++ 1. Add/remove vol                                         +
++ 2. Set sms status                                         +
++ 3. Vary online/offline                                    +
++ PF3 - EXIT                                                +
++                                                           +
++                                                           +
+% SELECT  ===>_ZCMD           +
++                                                           +
++                                                           +
++                                                           +
++                                                           +
++                                                           +
++ 1) ADD VOLUME IN STORAGE GROUP OR REMOVE. LIST VOLUMES    +
++ 2) SET ENABLED OR QSC NEW STATUS, REALLOCATE DATASETS     +
++ 3) ON/OFF DISKS AT VARIOUS SYSTEMS                        +
++                                                           +
++                                                           +
++                                                           +
+)INIT
+)PROC
+&ZSEL = TRANS(&ZCMD
+            1,'SMSADD'
+            2,'SMSVOL'
+            3,'SMSTAT')
+)HELP
+Field(ZCMD) Panel(SCTHELP)
+)end
