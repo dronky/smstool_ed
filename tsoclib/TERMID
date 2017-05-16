@@ -1,0 +1,28 @@
+ /*REXX*/
+TermId = SYSVAR('SYSTERMID')
+SystemId = MVSVAR('SYSNAME')
+IF substr(TermId,1,5) = 'LOCAL' THEN
+ DO
+   A = 'LOGON01' SYSVAR("SYSUID") 'logged on' SYSTEMID,
+   'from terminal:' TERMID 'TIME=' time()
+   "SE '"A "' OPERATOR(12)"
+ END
+                                ELSE
+ DO
+   x = outtrap('line.')
+   "NETSTAT TELNET (LUNAME " !! TermId !! ")"
+   x = outtrap('off')
+   n = line.0 - 1
+   DO i = 7 TO n
+     ipw = word(line.i,1)
+     IF ipw = 'EZZ2803I' THEN
+       DO
+         ipw = word(line.i,3)
+         len = index(ipw,'..') - 1
+       END
+  END
+         A = 'LOGON01' SYSVAR("SYSUID") 'logged on' SYSTEMID 'IP:',
+         substr(ipw,1,len) 'TIME=' time()
+         "SE '"A "' OPERATOR(12)"
+END
+exit 0

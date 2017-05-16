@@ -1,0 +1,26 @@
+/*   REXX   */
+ARG jobn
+x = outtrap('line.')
+"STATUS (" !! jobn !! ")"
+x = outtrap('off')
+n = line.0
+VIX = 0
+DO i = 0 TO n
+  cur_job = word(line.i,1)
+  IF cur_job = 'IKJ56202I' THEN  /* job is not in spool */
+    DO
+      SAY line.i
+      exit 12
+    END
+  IF cur_job = 'IKJ56211I' THEN /* job is running */
+    DO
+      SAY line.i
+      exit 0
+    END
+  IF cur_job = 'IKJ56192I' THEN  /* job is in output queue */
+    DO
+      SAY line.i
+      rc  = 4
+    END
+END
+EXIT rc

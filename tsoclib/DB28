@@ -1,0 +1,34 @@
+/* rexx */                                                              00010000
+/*trace i*/                                                             00020000
+/*********************************************************************/ 00030000
+/* This exec invokes CA's OPS/MVS dialog.  It assumes that the       */ 00040000
+/* OPS/MVS loadlib is available via LINKLIST.  If not, add the       */ 00050000
+/* OPS/MVS loadlib to LINKLIST or change this exec to use a Dynamic  */ 00060000
+/* STEPLIB product.  It also assumes that the OPS/MVS HELP file is   */ 00070000
+/* available via the SYSHELP concatenation, so be sure to add the    */ 00080000
+/* help file to your IKJTSOxx member in PARMLIB.  This exec is       */ 00090000
+/* provided courtesy of Darrell Presson at the Public Employees      */ 00100000
+/* Retirement System of Ohio.                                        */ 00110000
+/*********************************************************************/ 00120000
+parse arg ztrail                                                        00130000
+address tso "ALTLIB ACT APPL(CLIST) DATASET('DSN810.SDSNCLST')"         00160001
+address tso "ALTLIB ACT APPL(EXEC)  DATASET('DSN810.SDSNCLST')"         00170001
+address ispexec "LIBDEF SYSPROC DATASET ID('DSN810.SDSNCLST') STACK"    00190003
+address ispexec "LIBDEF SYSEXEC DATASET ID('DSN810.SDSNCLST') STACK"    00190103
+address ispexec "LIBDEF ISPLLIB DATASET ID('DSN810.SDSNLOAD') STACK"    00191003
+address ispexec "LIBDEF ISPMLIB DATASET ID('DSN810.SDSNSPFM') STACK"    00200002
+address ispexec "LIBDEF ISPPLIB DATASET ID('DSN810.SDSNSPFP',",         00210001
+                           "'DSN810.SDSNPFPE') STACK"                   00220001
+address ispexec "LIBDEF ISPSLIB DATASET ID('DSN810.SDSNSPFS') STACK"    00230001
+address ispexec "LIBDEF ISPTABL DATASET ID('DSN810.SDSNSPFT') STACK"    00240001
+address ispexec "LIBDEF ISPTLIB DATASET ID('DSN810.SDSNSPFT') STACK"    00250001
+/* ress ispexec "SELECT CMD(SYS "ztrail") NOCHECK SCRNAME(OPSMVS)" */   00280000
+address ispexec "SELECT CMD("DSNECPRI SSID(DB2P)")"                     00290005
+address ispexec "LIBDEF ISPMLIB"                                        00300000
+address ispexec "LIBDEF ISPLLIB"                                        00310000
+address ispexec "LIBDEF ISPPLIB"                                        00320000
+address ispexec "LIBDEF ISPSLIB"                                        00330000
+address ispexec "LIBDEF ISPTABL"                                        00340000
+address ispexec "LIBDEF ISPTLIB"                                        00350000
+address tso "ALTLIB DEACT APPL(CLIST)"                                  00360000
+address tso "ALTLIB DEACT APPL(EXEC)"                                   00370000

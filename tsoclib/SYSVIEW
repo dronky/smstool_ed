@@ -1,0 +1,21 @@
+/* REXX */
+/*********************************************************************/
+/* THIS EXEC INVOKES CA'S SYSVIEW DIALOG.                            */
+/*********************************************************************/
+PARSE UPPER ARG ZTRAIL
+MSGSAVE = MSG()
+X = MSG(OFF)
+/*********************************************************************/
+/* THIS FREE FOR SYSIN IS REQUIRED FOR THE LOGREC FUNCTION TO RUN.   */
+/*********************************************************************/
+ADDRESS TSO "FREE FI(SYSIN)"
+ADDRESS ISPEXEC "LIBDEF ISPPLIB DATASET ID('CAI.SYSVIEW.BASE.SCSYISPF')",
+                                                    "STACK"
+ADDRESS ISPEXEC "LIBDEF ISPTLIB DATASET ID('CAI.SYSVIEW.BASE.SCSYISPF')",
+                                                    "STACK"
+ADDRESS ISPEXEC "SELECT PGM(GSVXSPF) NEWAPPL(GSVX) NOCHECK MODE(FSCR)",
+                "PARM("ZTRAIL") PASSLIB SCRNAME(SYSVIEW)"
+ADDRESS ISPEXEC "LIBDEF ISPPLIB"
+ADDRESS ISPEXEC "LIBDEF ISPTLIB"
+ADDRESS TSO "ALLOC FI(SYSIN) DA(*) REUSE"
+X = MSG(MSGSAVE)

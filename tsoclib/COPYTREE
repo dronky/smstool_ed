@@ -1,0 +1,565 @@
+/* REXX */
+/**********************************************************************/
+/* Name: copytree                                                     */
+/* Copy a tree in a file system under another directory preserving    */
+/* all file attributes that can be preserved, or check a tree for     */
+/* structural integrity by accessing each node.                       */
+/*                                                                    */
+/* PROPERTY OF IBM                                                    */
+/* COPYRIGHT IBM CORP. 1999,2001                                      */
+/*                                                                    */
+/* Syntax:  copytree <source directory> <target directory>            */
+/*          copytree <source directory>                               */
+/* Notes:   this does not cross mountpoints.                          */
+/*          if an attribute needs to be set and the user does not     */
+/*          have sufficient authorization, a message is put out and   */
+/*          that attribute is not set on subsequent files.            */
+/* Options: specify option string with a - followed by all options    */
+/*          with no spaces, invalid options ignored:                  */
+/*             o   do not chown copied files                          */
+/*             s   set effective uid to 0 before copy/verify          */
+/*             a   process large trees without a message              */
+/*                                                                    */
+/* Changes:                                                           */
+/*     5/7/99 fix for special files                                   */
+/*    5/10/99 fix for i/o error handling                              */
+/*   12/27/99 fix for extlinks                                        */
+/*    3/12/00 better abort msg, handle bad uid/gid                    */
+/*    3/15/00 check tree, verify file size, stats                     */
+/*    3/17/00 file size for files sparse at the end, fix stats        */
+/*    3/27/00 add ino, etc to some error/warning messages             */
+/*    8/01/00 verify file blocks and file size as whole numbers       */
+/*    9/05/00 report block usage for check tree, decode error codes,  */
+/*            add s option for superuser authority                    */
+/*    2/08/01 create mount points, 30000 node limit                   */
+/*    2/13/01 only show block usage if lots appear missing            */
+/*                                                                    */
+/* Bill Schoen (wjs@us.ibm.com)   4/17/99                             */
+/**********************************************************************/
+maxnodes=30000
+parse source . . . . . . . omvs .
+tso= omvs<>'OMVS'
+if tso then call syscalls on
+parse arg opts srcpath dstpath .
+if substr(opts,1,1)<>'-' then
+   do
+   dstpath=srcpath
+   srcpath=opts
+   opts=''
+   end
+if srcpath='' then
+   do
+   say 'Usage: copytree -os sourcedir targetdir  checks and copies tree'
+   say '   or: copytree -s sourcedir             checks tree'
+   exit 1
+   end
+if pos('s',opts)>0 then
+   do
+   call syscall 'geteuid'
+   myeuid=retval
+   call syscall 'seteuid 0'
+   end
+if pos('a',opts)>0 then
+   maxnodes=999999
+if dstpath<>'' then
+   say 'Copying' srcpath 'to' dstpath
+ else
+   say 'Checking' srcpath
+call syscall 'stat (srcpath) st.'
+if datatype(st.st_blocks,'W')=0 then
+   st.st_blocks=0
+blocksinuse=st.st_blocks
+devno=st.st_dev
+if dstpath<>'' then
+   do
+   call syscall 'readdir (dstpath) dir.'
+   if dir.0>2 then
+      do
+      say 'Target directory must be empty'
+      signal exit
+      end
+   end
+pix=0
+ino.=''
+sum.=0
+mntx=0
+say 'Scanning for file nodes...'
+call rdir srcpath
+say 'Processing' pix 'nodes'
+
+sumsparse=0
+if dstpath<>'' then
+   do
+   /* pass 1: make dirs top to bottom */
+   say 'Creating directories'
+   do i=pix to 1 by -1
+      if paths.i.st_type=s_isdir then
+         do
+         dpath=dstpath'/'paths.i
+         call syscall 'mkdir (dpath) 700'
+         sum.s_isdir.2=sum.s_isdir.2+1
+         end
+   end
+
+   /* pass 2: make files  */
+   say 'Creating other files'
+   do i=1 to pix
+      dpath=dstpath'/'paths.i
+      select
+        when paths.i.st_type=s_isdir then
+          nop
+        when paths.i.st_type=s_ischr  then
+          if links() then
+             do
+             call syscall 'mknod (dpath)' word(paths.i.st_mode,1),
+                          paths.i.st_major paths.i.st_minor
+             sum.s_ischr.2=sum.s_ischr.2+1
+             end
+        when paths.i.st_type=s_isfifo then
+          if links() then
+             do
+             call syscall 'mkfifo (dpath)' word(paths.i.st_mode,1)
+             sum.s_isfifo.2=sum.s_isfifo.2+1
+             end
+        when paths.i.st_type=s_isreg  then
+          if links() then
+             do
+             call copyfile
+             end
+        when paths.i.st_type=s_issym  then
+          do
+          if paths.i.st_extlink=1 then
+             call syscall 'extlink (paths.i.0) (dpath)'
+           else
+             call syscall 'symlink (paths.i.0) (dpath)'
+          sum.s_issym.2=sum.s_issym.2+1
+          end
+        otherwise
+          nop
+      end
+   end
+   end
+ else
+   do i=1 to pix
+   if paths.i.st_type=s_isreg  then
+      do
+      if links() then
+         call copyfile
+      end
+    else
+      if paths.i.st_type=s_isreg or paths.i.st_type=s_issym then
+         do
+         if datatype(paths.i.st_blocks,'W')=1 then
+            blocksinuse=blocksinuse+paths.i.st_blocks
+         end
+       else
+         if links() then
+            if datatype(paths.i.st_blocks,'W')=1 then
+               blocksinuse=blocksinuse+paths.i.st_blocks
+   end
+
+if dstpath<>'' then
+   do
+   /* pass 3: set attributes */
+   say 'Setting file attributes'
+   ok.=1
+   z4='00000000'x
+   attr.='?'
+   attr.1='owner/group'
+   attr.2='mode'
+   attr.3='times'
+   attr.4='auditor audit'
+   attr.5='user audit'
+   attr.6='Program control'
+   attr.7='APF'
+   attr.8='Shared AS'
+   attr.9='Shared library'
+   attr.10='File format'
+   do i=1 to pix
+      dpath=dstpath'/'paths.i
+      if datatype(paths.i.st_uid,'W')=0 then
+         paths.i.st_uid=-1
+      if datatype(paths.i.st_gid,'W')=0 then
+         paths.i.st_gid=-1
+      if paths.i.st_uid=-1 or paths.i.st_gid=-1 then
+         say dpath': Unable to determine UID or GID, chown() defaulted'
+      if pos('o',opts)=0 then
+         call syscalla 1,'lchown (dpath)' paths.i.st_uid paths.i.st_gid
+      if paths.i.st_type=s_issym then iterate
+      call syscalla 2,'chmod (dpath)' paths.i.st_mode
+      if paths.i.st_aaudit<>0 then
+         call syscalla 4,'chaudit (dpath)' paths.i.st_aaudit 1
+      call syscalla 5,'chaudit (dpath)' paths.i.st_uaudit 0
+      if paths.i.st_type=s_isreg then
+         do
+         gm='00000002'x
+         if bitand(paths.i.st_genvalue,gm)<>z4 then
+            call syscalla 6,'chattr (dpath)' st_genvalue '(gm) (gm)'
+         gm='00000004'x
+         if bitand(paths.i.st_genvalue,gm)<>z4 then
+            call syscalla 7,'chattr (dpath)' st_genvalue '(gm) (gm)'
+         gm='00000008'x
+         if bitand(paths.i.st_genvalue,gm)<>z4 then
+            call syscalla 8,'chattr (dpath)' st_genvalue '(gm) (gm)'
+         gm='00000010'x
+         if bitand(paths.i.st_genvalue,gm)<>z4 then
+            call syscalla 9,'chattr (dpath)' st_genvalue '(gm) (gm)'
+
+         call syscalla 10,'chattr (dpath)' st_filefmt paths.i.st_filefmt
+         end
+      call syscalla 3,'chattr (dpath)' st_atime paths.i.st_atime,
+                                       st_mtime paths.i.st_mtime,
+                                       st_ctime paths.i.st_ctime
+   end
+   end
+if dstpath<>'' & mntx>1 then
+   do
+   /* pass 4: set attributes */
+   say 'Creating mount points'
+   do i=2 to mntx  /* skip .. */
+      dpath=dstpath'/'substr(mntpt.i,length(srcpath)+1)
+      call syscall 'mkdir (dpath) 700'
+      if pos('o',opts)=0 then
+         call syscalla 1,'lchown (dpath)' mntpt.i.2 mntpt.i.3
+      call syscalla 2,'chmod (dpath)' mntpt.i.1
+   end
+   end
+
+ec=sum.1.1+sum.2.1+sum.3.1+sum.4.1
+say
+say    '*******************'
+say
+if dstpath='' then
+   do
+   say 'Check complete.  Error count=' ec
+   say 'Directory errors:  ' sum.s_isdir.1
+   say 'File errors:       ' sum.s_isreg.1
+   say 'Symlink errors:    ' sum.s_issym.1
+   say 'Char-spec errors:  ' sum.s_ischr.1
+   say 'FIFO errors:       ' sum.s_isfifo.1
+   say 'Sparse file count: ' sumsparse
+   say
+   address syscall 'statvfs (srcpath) vfs.'
+   blk20=vfs.stfs_inuse * .2
+   unacct=vfs.stfs_inuse - blocksinuse
+   if unacct>blk20 then
+      do
+      say 'Blocks allocated:  ' vfs.stfs_inuse
+      say 'Blocks in use:     ' blocksinuse
+      say '      Unaccounted: ' unacct
+      end
+   end
+ else
+   do
+   say 'Copy complete.  Error count=' ec
+   say 'Directory errors:  ' sum.s_isdir.1
+   say 'Directories copied:' sum.s_isdir.2
+   say 'File errors:       ' sum.s_isreg.1
+   say 'Files copied:      ' sum.s_isreg.2
+   say 'Symlink errors:    ' sum.s_issym.1
+   say 'Symlinks copied:   ' sum.s_issym.2
+   say 'Char-spec errors:  ' sum.s_ischr.1
+   say 'Char-spec copied:  ' sum.s_ischr.2
+   say 'FIFO errors:       ' sum.s_isfifo.1
+   say 'FIFOs copied:      ' sum.s_isfifo.2
+   say 'Sparse file count: ' sumsparse
+   end
+
+call reseteuid
+exit ec
+
+exit:
+   call reseteuid
+   exit 2
+
+reseteuid:
+   if pos('s',opts)>0 then
+      address syscall 'seteuid' myeuid
+   return
+
+links:
+   if paths.i.st_nlink<2 then return 1
+   ino=paths.i.st_ino
+   if ino.ino=='' then
+      do
+      ino.ino=dpath
+      return 1
+      end
+   if dstpath<>'' then
+      call syscall 'link (ino.ino) (dpath)'
+   return 0
+
+copyfile:
+   numeric digits 20
+   if datatype(paths.i.st_blocks,'W')=0 then
+      do
+      say 'Cannot determine number of file blocks:' src
+      sum.s_isreg.1=sum.s_isreg.1+1
+      return
+      end
+   blocksinuse=blocksinuse+paths.i.st_blocks
+   dense=paths.i.st_blocks * 4096
+   src=srcpath'/'paths.i
+   if datatype(paths.i.st_size,'W')=0 then
+      if tso then
+         do
+         say 'File to large for TSO environment:' src
+         sum.s_isreg.1=sum.s_isreg.1+1
+         return
+         end
+       else
+         paths.i.st_size=stream(src,'c','size')
+   if datatype(paths.i.st_size,'W')=0 then
+      do
+      say 'Cannot determine file size:' src
+      sum.s_isreg.1=sum.s_isreg.1+1
+      return
+      end
+   address syscall 'open (src)' o_rdonly 000
+   sfd=retval
+   if sfd=-1 then
+      do
+      say 'Cannot open file (ino='paths.i.st_ino'):' src
+      sum.s_isreg.1=sum.s_isreg.1+1
+      return
+      end
+   if dstpath<>'' then
+      address syscall 'creat (dpath)' 700
+   dfd=retval
+   if dfd=-1 then
+      do
+      say 'Cannot open target file:' dpath
+      sum.s_isreg.1=sum.s_isreg.1+1
+      end
+   else
+      if paths.i.st_size>dense then
+         call copysparse
+       else
+         call copydense
+   trace o
+   address syscall 'close' sfd
+   address syscall 'close' dfd
+   return
+
+copydense:
+   copysz=0
+   do forever
+      address syscall 'read' sfd 'buf' 4096*16
+      k=retval
+      copysz=copysz+k
+      if retval=-1 then
+         do
+         call perr 'Error' errno errnojr 'reading file',
+             '(ino='paths.i.st_ino'):' src
+         sum.s_isreg.1=sum.s_isreg.1+1
+         return
+         end
+      if k=0 then
+         do
+         if copysz<>paths.i.st_size then
+            do
+            say 'Error - unable to read complete file:',
+                '(ino='paths.i.st_ino'):' src
+            sum.s_isreg.1=sum.s_isreg.1+1
+            end
+          else
+            sum.s_isreg.2=sum.s_isreg.2+1
+         return
+         end
+      if dstpath='' then
+         return
+      address syscall 'write' dfd 'buf' k
+      if retval=k then iterate
+      sum.s_isreg.1=sum.s_isreg.1+1
+      say 'Unable to write complete file:' dpath
+      wrerrno=errno
+      if retval=-1 then
+         call perr 'Error' errno errnojr 'writing file',
+             '(ino='paths.i.st_ino'):' src
+      if wrerrno=enospc then
+         do
+         say 'Out of space, aborting the copy'
+         say '****** copytree aborting ******'
+         signal exit
+         end
+      return
+   end
+
+copysparse:
+   say 'Warning - file is sparse (sz='paths.i.st_size,
+      'blks='paths.i.st_blocks 'ino='paths.i.st_ino'):' src
+   sumsparse=sumsparse+1
+   copysz=0
+   zbuf=copies('00'x,4096)
+   do forever
+      address syscall 'read' sfd 'buf' 4096
+      k=retval
+      copysz=copysz+k
+      if retval=-1 then
+         do
+         call perr 'Error' errno errnojr 'reading file',
+             '(ino='paths.i.st_ino'):' src
+         sum.s_isreg.1=sum.s_isreg.1+1
+         return
+         end
+      if k=0 then
+         do
+         if copysz<>paths.i.st_size then
+            do
+            say 'Error - unable to read complete file',
+                '(ino='paths.i.st_ino'):' src
+            sum.s_isreg.1=sum.s_isreg.1+1
+            end
+          else
+            do
+            if dstpath<>'' then
+               if datatype(paths.i.st_size,'W')=0 then
+                  do
+                  say 'Cannot set file size:' dpath
+                  end
+                else
+                  do
+                  address syscall 'ftrunc' dfd paths.i.st_size
+                  if rc<0 or retval=-1 then
+                     say 'Cannot set file size:' dpath
+                  end
+            sum.s_isreg.2=sum.s_isreg.2+1
+            end
+         return
+         end
+      if dstpath='' then
+         return
+      if buf=zbuf then
+         do
+         address syscall 'lseek' dfd 4096 seek_cur
+         iterate
+         end
+      address syscall 'write' dfd 'buf' k
+      if retval=k then iterate
+      sum.s_isreg.1=sum.s_isreg.1+1
+      say 'Unable to write complete file:' dpath
+      wrerrno=errno
+      if retval=-1 then
+         call perr 'Error' errno errnojr 'writing file:' src
+      if wrerrno=enospc then
+         do
+         say 'Out of space, aborting the copy'
+         say '****** copytree aborting ******'
+         signal exit
+         end
+      return
+   end
+
+syscall:
+   parse arg xx
+   address syscall xx
+   if rc>=0 & retval<>-1 then return
+   parse var xx '(' nm ')'
+   if nm<>'' then nm=value(nm)
+   say xx
+   call perr nm 'Error codes:' rc retval errno errnojr
+   say '****** copytree aborting ******'
+   signal exit
+
+perr:
+   say arg(1)
+   etxt.0=0
+   if retval=-1 then
+      address syscall 'strerror' errno errnojr 'etxt.'
+   if etxt.0>0 then
+      do
+      say etxt.se_errno
+      say
+      say etxt.se_reason
+      say
+      say etxt.se_action
+      end
+   return
+
+syscalla:
+   parse arg ok,xx
+   if ok.ok then
+      do
+      address syscall xx
+      if rc>=0 & retval<>-1 then return
+      if rc>=0 & retval=-1 & errno=enoent then return
+      call perr 'Error codes:' rc retval errno errnojr
+      say xx
+      say 'Attribute change for' attr.ok 'is now disabled'
+      ok.ok=0
+      end
+   parse var xx '(' nm ')'
+   if nm<>'' then nm=value(nm)
+   say nm':' attr.ok 'not set'
+   return
+
+rdir: procedure expose types calltp paths. pix ino. devno srcpath sum.,
+                       mntpt. mntx maxnodes
+   call syscalls on
+   parse arg path
+   d.0=0
+   address syscall 'readdir (path) d.'
+   if d.0=0 then
+      do
+      say 'Cannot read directory:' path
+      sum.s_isdir.1=sum.s_isdir.1+1
+      end
+   else
+   do i=1 to d.0
+      dpath=path'/'d.i
+      address syscall 'lstat (dpath)' st.
+      if st.st_dev<>devno then
+         do
+         say 'Skipping mountpoint:' dpath
+         mntx=mntx+1
+         mntpt.mntx=dpath
+         mntpt.mntx.1=st.st_mode st.st_setuid st.st_setgid st.st_sticky
+         mntpt.mntx.2=st.st_uid
+         mntpt.mntx.3=st.st_gid
+         iterate
+         end
+      if st.st_type=s_isdir & d.i<>'.' & d.i<>'..' then
+         call rdir dpath
+      if d.i<>'.' & d.i<>'..' then
+         call processname
+   end
+   return
+processname:
+   pix=pix+1
+   if pix>maxnodes then
+      do
+      say
+      say '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+      say 'Tree contains more than' maxnodes 'files'
+      say 'To continue enter YES.  Any other response will end.'
+      say 'The copytree -a option can be used to process the entire'
+      say 'tree without this message.'
+      pull resp .
+      say
+      if resp='YES' then
+         maxnodes=999999
+       else
+         exit 1
+      end
+   paths.pix=substr(dpath,length(srcpath)+1)
+   paths.pix.st_mode=st.st_mode st.st_setuid st.st_setgid st.st_sticky
+   paths.pix.st_uid=st.st_uid
+   paths.pix.st_gid=st.st_gid
+   paths.pix.st_mtime=st.st_mtime
+   paths.pix.st_atime=st.st_atime
+   paths.pix.st_ctime=st.st_ctime
+   paths.pix.st_type=st.st_type
+   paths.pix.st_blocks=st.st_blocks
+   paths.pix.st_size=st.st_size
+   paths.pix.st_ino=st.st_ino
+   paths.pix.st_major=st.st_major
+   paths.pix.st_minor=st.st_minor
+   paths.pix.st_nlink=st.st_nlink
+   paths.pix.st_extlink=st.st_extlink
+   paths.pix.st_genvalue=st.st_genvalue
+   paths.pix.st_aaudit=st.st_aaudit
+   paths.pix.st_uaudit=st.st_uaudit
+   paths.pix.st_filefmt=st.st_filefmt
+   if st.st_type=s_issym  then
+      address syscall 'readlink (dpath) paths.'pix'.0'
+   return

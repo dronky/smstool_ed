@@ -1,0 +1,22 @@
+/*   REXX   */
+ARG num
+/*
+IF n > 6 THEN
+  DO
+    SAY 'Label cann't have length more 6 symbols'
+    exit 8
+  END
+  */
+x = outtrap('line.')
+"RMM SD DSNAME('**') OWNER(*) LIMIT(*) STATUS(PRIVATE) VOLUME(" !!NUM !! ")"
+x = outtrap('off')
+n = line.0 - 1
+IF n < 1 THEN
+  DO
+    SAY 'There are no data sets on volume'
+    exit 8
+  END
+DO i = 1 TO n
+  say line.i
+END
+exit 0

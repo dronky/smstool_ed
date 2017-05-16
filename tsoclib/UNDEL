@@ -1,0 +1,29 @@
+        PROC 1 DSNAME +                                                 00000100
+               VOLUME()                                                 00000300
+ /**  CONTROL NOMSG  CONLIST SYMLIST                                    00000400
+      CONTROL NOMSG                                                     00000500
+         SET LOADLIB  = SYS1.SERVICE                                    00000600
+         SET PROGNAME = ##SUNDEL                                        00000700
+ /**                                                                    00000800
+ /** OCBOÁOÆÄEHÈE È PACÏPEÄEËEHÈE OÏEPATOPOB DD UNDELLIB È UNDELPRT     00000900
+ /** ---------------------------- HAÏPABËEHÈß ÏEPEÄA×È                  00001000
+ /**                                                                    00001100
+         FREE  FI(UNDELPRT UNDELLIB)                                    00001200
+ /**                                                                    00001300
+ /** BETBËEHÈE B ÇABÈCÈMOCTÈ OT ÇAÄAHHOCTÈ VOLUME                       00001400
+ /** --------------------------------------------                       00001500
+         SET  TEMPVAR =                                                 00001600
+         IF &STR(&VOLUME) = &STR( ) THEN -                              00001700
+               SET TEMPVAR =                                            00001800
+         IF &STR(&VOLUME) NE &STR( ) THEN -                             00001900
+               SET TEMPVAR = VOL(&STR(&VOLUME))                         00002000
+      CONTROL MSG                                                       00002100
+         ALLOC FI(UNDELLIB) DA(&DSNAME) SHR &TEMPVAR                    00002200
+         WHEN SYSRC(> 0) END                                            00002300
+         ALLOC FI(UNDELPRT) DA(*)                                       00002400
+ /**                                                                    00002500
+ /** BÛÇOB ÏPOÃPAMMÛ HA OÁPAÁOTKÓ                                       00002600
+ /**                                                                    00002700
+         CALL '&LOADLIB(&PROGNAME)'                                     00002800
+         FREE FI(UNDELLIB UNDELPRT)                                     00002900
+           END                                                          00003000

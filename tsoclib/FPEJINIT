@@ -1,0 +1,1084 @@
+/**Start of REXX Specifications***************************************/
+/*                                                                   */
+/* MODULE-NAME      = FPEJINIT                                       */
+/* DESCRIPTIVE-NAME = Invoke OMEGAMON XE for DB2 PE on z/OS          */
+/*                    ISPF Application                               */
+/*                                                                   */
+/* COPYRIGHT = IBM OMEGAMON XE for DB2 PE on z/OS V5.1               */
+/*             Licensed Material - Property of IBM                   */
+/*             5655-W37 ý Copyright IBM Corp. 1993, 2010             */
+/*                                                                   */
+/* FUNCTION  = This EXEC is invoked from any menu on which you have  */
+/*             placed a OMEGAMON XE for DB2 PE ISPF application,     */
+/*             a IBM DB2 Buffer Pool Analyzer ISPF application       */
+/*             and from the SOURCE EXPLAIN facility.                 */
+/*             It allocates all the product libraries,               */
+/*             invokes the requested application, and upon exit      */
+/*             restores the libraries to their previous status.      */
+/*                                                                   */
+/* NOTES        = See below                                          */
+/* DEPENDENCIES = ISPF                                               */
+/* RESTRICTIONS = None                                               */
+/*                                                                   */
+/* MODULE-TYPE  = REXX procedure                                     */
+/* PROCESSOR    = TSO/E REXX processor                               */
+/*                                                                   */
+/* ----------------------------------------------------------------- */
+/*                                                                   */
+/* 1. This EXEC invokes the following ISPF applications:             */
+/*    - IBM Tivoli OMEGAMON XE for DB2 Performance Expert on z/OS    */
+/*      Short name: OMEGAMON XE DB2 PE                               */
+/*    - IBM Tivoli OMEGAMON XE for DB2 Performance Monitor on z/OS   */
+/*      Short name: OMEGAMON XE DB2 PM                               */
+/*    - IBM DB2 Buffer Pool Analyzer for z/OS                        */
+/*      Short name: BPA                                              */
+/*                                                                   */
+/* 2. Customization of section "Common"                              */
+/*    - Set checks=0;                                                */
+/*      if used in a production environment                          */
+/*    - Set checks=1;                                                */
+/*      if used to verify the installation                           */
+/*    - Set language="ENU";                                          */
+/*      or  language="JPN";                                          */
+/*                                                                   */
+/* 3. Customization of section "ICAT / DB2"                          */
+/*    - Set db2_mode=0;                                              */
+/*      if the DB2 load libraries SDSNEXIT and SDSNLOAD              */
+/*      are already allocated by                                     */
+/*      LNKLSTnn, LPALSTnn, TSO STEPLIB DD or TSOLIB command.        */
+/*    - Set db2_mode=1;                                              */
+/*      to concatenate the libraries SDSNEXIT and SDSNLOAD           */
+/*      to the ISPF task library ISPLLIB.                            */
+/*      Set lib4.1 to the full data set name of SDSNEXIT.            */
+/*      Set lib4.2 to the full data set name of SDSNLOAD.            */
+/*      - Notes:                                                     */
+/*        - This parameter db2_mode=1 is for development test only.  */
+/*        - In a production environment there must be db2_mode=0.    */
+/*        - A "Module not found" condition occurs                    */
+/*          if the application uses LOAD, LINK, XCTL or ATTACH.      */
+/*        - Function "6b. Collect Report Data - BPA"                 */
+/*          is not supported for db2_mode=1.                         */
+/*                                                                   */
+/* 4. Customization of section "ICAT / User"                         */
+/*    - Set rte_mode=0;                                              */
+/*      if BPA standalone is installed.                              */
+/*    - Set rte_mode=1;                                              */
+/*      if OMEGAMON XE DB2 PE or OMEGAMON XE DB2 PM                  */
+/*      is installed and customized by ICAT.                         */
+/*    - If rte_mode=1                                                */
+/*      then set hlq3.1 to the high level qualifier specified        */
+/*      for the runtime environment (RTE) when running ICAT.         */
+/*                                                                   */
+/* 5. Customization of section "SMPE / BPA"                          */
+/*    - Set smpe_mode=0;                                             */
+/*      if OMEGAMON XE DB2 PE or OMEGAMON XE DB2 PM                  */
+/*      is installed and customized by ICAT.                         */
+/*    - Set smpe_mode=1;                                             */
+/*      if OMEGAMON XE DB2 PE or OMEGAMON XE DB2 PM                  */
+/*      is installed and you want to verify the SMP/E data sets      */
+/*      before running ICAT.                                         */
+/*    - Set smpe_mode=1;                                             */
+/*      if BPA standalone is installed.                              */
+/*    - If smpe_mode=1                                               */
+/*      then set hlq2.1 to the high level qualifier defined          */
+/*      for the SMP/E data sets.                                     */
+/*                                                                   */
+/* 6. Customization of section "SCLM / Other test libs"              */
+/*    - Set sclm_mode=0;                                             */
+/*    - This section is used only to concatenate special             */
+/*      test libraries before RTE or SMP/E libraries.                */
+/*                                                                   */
+/* 7. Customization summary                                          */
+/*    - Summary columns:                                             */
+/*      - 1: Value of sclm_mode                                      */
+/*      - 2: Value of smpe_mode                                      */
+/*      - 3: Value of rte_mode                                       */
+/*    - Summary table:                                               */
+/*      - 1 2 3 Description                                          */
+/*      - - - - ---------------------------------------------------- */
+/*      - 0 0 1 Production OMEGAMON XE DB2 PE or PM                  */
+/*      - 0 1 0 Verification OMEGAMON XE DB2 PE or PM                */
+/*      - 0 1 0 Production BPA standalone                            */
+/*                                                                   */
+/* ----------------------------------------------------------------- */
+/*                                                                   */
+/* Change-Activity:                                                  */
+/*                                                                   */
+/* $MAC(FPEJINIT),COMP(IBASE),PROD(DB2PM):                           */
+/*                                                                   */
+/* Code Reason  Rlse Date   Origin Comments                          */
+/* ---- ------- ---- ------ ------ --------------------------------- */
+/* $L0= Version 110  020517 XRK:   New product Perf Expert V110      */
+/* $L2= LI00000 110  020517 XRK:   Integrate DGO and BPO to FPE      */
+/* $P3= PQ74977 110  030602 NKA:   Corrections to libdefs:           */
+/*                                 Error case and ilinks = 1         */
+/* $L0= Version 310  050101 XRK:   New product OMEGAMON XE DB2 PE V3 */
+/* $L4= LI184   310  050608 XRK:   Add SCLM or other test libs       */
+/* $L4= LI184   310  050608 XRK:   Add ICAT runtime libs             */
+/* $L4= LI184   310  050608 XRK:   Remove GDDM / No graphics on host */
+/* $L4= LI00000 310  050629 XRK:   Add SMP/E libs for BPA w/o RTE    */
+/* $L5= LI00000 310  050812 XRK:   Use available RTE data sets       */
+/* $L6= DE17003 310  051107 XRK:   Set OSTEPLIB in PROFILE for IRF   */
+/* $L7= DE17560 310  060221 XRK:   Alloc SDSNLOAD to ISPLLIB         */
+/* $L0= Version 410  060701 XRK:   New prod OMEGAMON XE DB2 PE V4    */
+/* $L8= DE18680 410  061003 XRK:   Alloc RKANMODU to ISPLLIB         */
+/* $L9= DE00000 410  070130 XRK:   Change O110 to O410               */
+/* $31= PK45698 410  070611 XRK:   Set all LMod libs for IRF         */
+/*                                 Use PROFILE vars OSTEPLnn         */
+/* $32= PK47307 410  070618 XRK:   Remove duplicate RTE LMod libs    */
+/* $33= PK53862 410  071002 XRK:   All RKANMOD* "Sharing" libs       */
+/*                                 before "Base" libs                */
+/* $L0= Version 420  080701 XRK:   New prod OMEGAMON XE DB2 PE V420  */
+/* $34= CR42113 420  080804 XRK:   Change product version to "420"   */
+/* $L0= Version 510  100301 XRK:   New prod OMEGAMON XE DB2 PE V510  */
+/* $35= CR51000 510  100316 XRK:   Change product version to "510"   */
+/**End of Specifications**********************************************/
+trace off;
+trace_flag = 0;
+/*===================================================================*/
+/* Start of "Common" modifiable section                              */
+/*===================================================================*/
+checks   = 1;
+language = "ENU";
+/*===================================================================*/
+/* Start of "ICAT / DB2" modifiable section for DB2 load libs        */
+/*===================================================================*/
+db2_mode = 0;
+lib4.1   = "DB2 data set name SDSNEXIT";
+lib4.2   = "DB2 data set name SDSNLOAD";
+/*===================================================================*/
+/* Start of "ICAT / User" modifiable section for RTE                 */
+/*===================================================================*/
+rte_mode = 1;
+hlq3.1   = "OMN.DB2"!!MVSVAR('SYSCLONE');
+hlq3.2   = "OMN.BASE.R";
+
+/*===================================================================*/
+/* Start of "SMPE / BPA" modifiable section                          */
+/*===================================================================*/
+
+smpe_mode = 0;
+hlq2.1    = "hlq of SMP/E data sets";
+
+/*===================================================================*/
+/* Start of "SCLM / Other test libs" modifiable section              */
+/*===================================================================*/
+
+sclm_mode = 0;
+hlq1.1    = "D01O420.APARn";
+hlq1.2    = "D01O420.APARnC";
+hlq1.3    = "D01O420.LEVEL2";
+hlq1.4    = "D01O420.FINAL";
+
+/*===================================================================*/
+/* End of "All" modifiable sections                                  */
+/*===================================================================*/
+
+/*-------------------------------------------------------------------*/
+/* Define number of specified hlqs                                   */
+/*-------------------------------------------------------------------*/
+
+/* Set hlq1.0 for SCLM libs                                          */
+if (sclm_mode = 1)                                           /* @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    k = 0;                                                   /* @L4A */
+    do i = 1 to 8;                                           /* @L4A */
+      if (hlq1.i = "HLQ1."!!Format(i)) ! ,                   /* @L4A */
+         (hlq1.i = "")                                       /* @L4A */
+      then leave;                                            /* @L4A */
+      else k = k + 1;                                        /* @L4A */
+    end;                                                     /* @L4A */
+    hlq1.0 = k;                                              /* @L4A */
+  end;                                                       /* @L4A */
+
+/* Set hlq2.0 for SMPE libs                                          */
+if (smpe_mode = 1)                                           /* @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    k = 0;                                                   /* @L4A */
+    do i = 1 to 8;                                           /* @L4A */
+      if (hlq2.i = "HLQ2."!!Format(i)) ! ,                   /* @L4A */
+         (hlq2.i = "")                                       /* @L4A */
+      then leave;                                            /* @L4A */
+      else k = k + 1;                                        /* @L4A */
+    end;                                                     /* @L4A */
+    hlq2.0 = k;                                              /* @L4A */
+  end;                                                       /* @L4A */
+
+/* Set hlq3.0 for RTE (Runtime Environment) libs                     */
+if (rte_mode = 1)                                            /* @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    k = 0;                                                   /* @L4A */
+    do i = 1 to 8;                                           /* @L4A */
+      if (hlq3.i = "HLQ3."!!Format(i)) ! ,                   /* @L4A */
+         (hlq3.i = "")                                       /* @L4A */
+      then leave;                                            /* @L4A */
+      else k = k + 1;                                        /* @L4A */
+    end;                                                     /* @L4A */
+    hlq3.0 = k;                                              /* @L4A */
+  end;                                                       /* @L4A */
+
+/* Set lib4.0 for DB2 libs                                           */
+if (db2_mode = 1)                                            /* @L7A */
+then                                                         /* @L7A */
+  do;                                                        /* @L7A */
+    k = 0;                                                   /* @L7A */
+    do i = 1 to 8;                                           /* @L7A */
+      if (lib4.i = "LIB4."!!Format(i)) ! ,                   /* @L7A */
+         (lib4.i = "")                                       /* @L7A */
+      then leave;                                            /* @L7A */
+      else k = k + 1;                                        /* @L7A */
+    end;                                                     /* @L7A */
+    lib4.0 = k;                                              /* @L7A */
+  end;                                                       /* @L7A */
+
+/*-------------------------------------------------------------------*/
+/* Remove ".R" or ".T" from hlq3 if available                        */
+/*-------------------------------------------------------------------*/
+
+if (rte_mode = 1)                                            /* @L5C */
+then                                                         /* @L5C */
+  do k = 1 to hlq3.0;                                        /* @L5C */
+    len = length(hlq3.k);                                    /* @L5C */
+    pos = max(1,len - 1);                                    /* @L5C */
+    if (substr(hlq3.k,pos,2) = ".R") ! ,                     /* @L5C */
+       (substr(hlq3.k,pos,2) = ".T")                         /* @L5C */
+    then hlq3.k = substr(hlq3.k,1,pos-1);                    /* @L5C */
+  end;                                                       /* @L5C */
+
+/*-------------------------------------------------------------------*/
+/* Remove duplicate hlq3 library names                               */
+/*-------------------------------------------------------------------*/
+
+if (rte_mode = 1)                                            /* @32A */
+then                                                         /* @32A */
+  do;                                                        /* @32A */
+    /* Copy names and init flag list                            @32A */
+    tmp_flag.0 = hlq3.0;                                     /* @32A */
+    do i = 1 to tmp_flag.0;                                  /* @32A */
+      tmp_flag.i = 1;                                        /* @32A */
+      tmp_name.i = hlq3.i;                                   /* @32A */
+    end;                                                     /* @32A */
+
+    /* Flag all duplicate names                                 @32A */
+    do i = 1 to tmp_flag.0;                                  /* @32A */
+      if (tmp_flag.i = 0) then iterate;                      /* @32A */
+      namei = tmp_name.i;                                    /* @32A */
+      do j = i+1 to tmp_flag.0;                              /* @32A */
+        if (tmp_flag.j = 0) then iterate;                    /* @32A */
+        namej = tmp_name.j;                                  /* @32A */
+        if (namej = namei)                                   /* @32A */
+        then tmp_flag.j = 0;                                 /* @32A */
+      end;                                                   /* @32A */
+    end;                                                     /* @32A */
+
+    /* Build new list without duplicate names                   @32A */
+    k = 0;                                                   /* @32A */
+    do i = 1 to tmp_flag.0;                                  /* @32A */
+      if (tmp_flag.i = 1)                                    /* @32A */
+      then                                                   /* @32A */
+        do;                                                  /* @32A */
+          k      = k + 1;                                    /* @32A */
+          hlq3.k = tmp_name.i;                               /* @32A */
+        end;                                                 /* @32A */
+    end;                                                     /* @32A */
+    hlq3.0 = k;                                              /* @32A */
+
+  end;                                                       /* @32A */
+
+/*-------------------------------------------------------------------*/
+/* Prepare list of available RTE libs                                */
+/*-------------------------------------------------------------------*/
+
+if (rte_mode = 1)                                            /* @L5C */
+then                                                         /* @L5C */
+  do;                                                        /* @L5C */
+    /*---------------------------------------------------------------*/
+    /* Tab1: List of files (name language type) in format 1          */
+    /*---------------------------------------------------------------*/
+
+    k = 0;                                                   /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2EXEC COM TSOEXEC';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2EXEC COM TSOEXEC';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKD2SAM  COM TSOCLIS';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKD2SAM  COM TSOCLIS';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKANCLI  COM TSOCLIS';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKANCLI  COM TSOCLIS';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKANMODU COM ISPLLIB';              /* @L8A */
+    k=k+1; rte_tab1.k = 'RKANMOD  COM ISPLLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKANMOD  COM ISPLLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2SLIB COM ISPSLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2SLIB COM ISPSLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2PENU ENU ISPPLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2PENU ENU ISPPLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2MENU ENU ISPMLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2MENU ENU ISPMLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2TENU ENU ISPTLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2TENU ENU ISPTLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2PJPN JPN ISPPLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2PJPN JPN ISPPLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2MJPN JPN ISPMLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2MJPN JPN ISPMLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'RKO2TJPN JPN ISPTLIB';              /* @L5C */
+    k=k+1; rte_tab1.k = 'TKO2TJPN JPN ISPTLIB';              /* @L5C */
+    rte_tab1.0 = k;                                          /* @L5C */
+
+    /*---------------------------------------------------------------*/
+    /* Tab2: List of files (name language type) in format 2          */
+    /*---------------------------------------------------------------*/
+
+    do k = 1 to rte_tab1.0;                                  /* @L5C */
+      parse var rte_tab1.k v_name v_lang v_type;             /* @L5C */
+      rte_tab2.name.k = v_name;                              /* @L5C */
+      rte_tab2.lang.k = v_lang;                              /* @L5C */
+      rte_tab2.type.k = v_type;                              /* @L5C */
+    end;                                                     /* @L5C */
+    rte_tab2.0 = rte_tab1.0;                                 /* @L5C */
+
+    /*---------------------------------------------------------------*/
+    /* Tab3: List of possible RTE libs                               */
+    /*---------------------------------------------------------------*/
+
+    if (trace_flag = 1)                                      /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        trace_rec = ' ';                                     /* @31A */
+        say trace_rec;                                       /* @31A */
+        trace_rec = 'List of possible RTE libraries ';       /* @L5C */
+        trace_rec = trace_rec!!'(Language Type Dsn):';       /* @L5C */
+        say trace_rec;                                       /* @L5C */
+      end;                                                   /* @L5C */
+
+    k = 0;                                                   /* @L5C */
+    do j = 1 to hlq3.0;                                      /* @33M */
+      do i = 1 to rte_tab2.0;                                /* @33M */
+        v_hlq  = hlq3.j;                                     /* @L5C */
+        v_name = rte_tab2.name.i;                            /* @L5C */
+        v_lang = rte_tab2.lang.i;                            /* @L5C */
+        v_type = rte_tab2.type.i;                            /* @L5C */
+
+        k = k + 1;                                           /* @L5C */
+        rte_tab3.dsn.k  = v_hlq!!'.'!!v_name;                /* @L5C */
+        rte_tab3.lang.k = v_lang;                            /* @L5C */
+        rte_tab3.type.k = v_type;                            /* @L5C */
+
+        if (trace_flag = 1)                                  /* @L5C */
+        then                                                 /* @L5C */
+          do;                                                /* @L5C */
+            trace_rec = rte_tab3.lang.k;                     /* @L5C */
+            trace_rec = trace_rec rte_tab3.type.k            /* @L5C */
+            trace_rec = trace_rec rte_tab3.dsn.k;            /* @L5C */
+            say trace_rec;                                   /* @L5C */
+          end;                                               /* @L5C */
+      end;                                                   /* @L5C */
+    end;                                                     /* @L5C */
+    rte_tab3.0 = k;                                          /* @L5C */
+
+    /*---------------------------------------------------------------*/
+    /* Tab4: List of available RTE libs                              */
+    /*---------------------------------------------------------------*/
+
+    if (trace_flag = 1)                                      /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        trace_rec = ' ';                                     /* @31A */
+        say trace_rec;                                       /* @31A */
+        trace_rec = 'List of available RTE libraries ';      /* @L5C */
+        trace_rec = trace_rec!!'(Language Type Dsn):';       /* @L5C */
+        say trace_rec;                                       /* @L5C */
+      end;                                                   /* @L5C */
+
+    k = 0;                                                   /* @L5C */
+    do i = 1 to rte_tab3.0;                                  /* @L5C */
+      v_dsn = rte_tab3.dsn.i;                                /* @L5C */
+      v_dsn = "'"!!v_dsn!!"'";                               /* @L5C */
+      if (sysdsn(v_dsn) = 'OK')                              /* @L5C */
+      then                                                   /* @L5C */
+        do;                                                  /* @L5C */
+          k = k + 1;                                         /* @L5C */
+          rte_tab4.dsn.k  = rte_tab3.dsn.i;                  /* @L5C */
+          rte_tab4.lang.k = rte_tab3.lang.i;                 /* @L5C */
+          rte_tab4.type.k = rte_tab3.type.i;                 /* @L5C */
+
+          if (trace_flag = 1)                                /* @L5C */
+          then                                               /* @L5C */
+            do;                                              /* @L5C */
+              trace_rec = rte_tab4.lang.k;                   /* @L5C */
+              trace_rec = trace_rec rte_tab4.type.k          /* @L5C */
+              trace_rec = trace_rec rte_tab4.dsn.k;          /* @L5C */
+              say trace_rec;                                 /* @L5C */
+            end;                                             /* @L5C */
+        end;                                                 /* @L5C */
+    end;                                                     /* @L5C */
+    rte_tab4.0 = k;                                          /* @L5C */
+
+  end;                                 /* End of: rte_mode      @L5C */
+
+/*-------------------------------------------------------------------*/
+/* Init local control variables                                      */
+/*-------------------------------------------------------------------*/
+
+altlib_exe_used  = 0;                                        /* @L4C */
+altlib_cli_used  = 0;                                        /* @L4A */
+libdef_llib_used = 0;                                        /* @L4A */
+libdef_mlib_used = 0;                                        /* @L4A */
+libdef_plib_used = 0;                                        /* @L4A */
+libdef_tlib_used = 0;                                        /* @L4A */
+libdef_slib_used = 0;                                        /* @L4A */
+
+/*-------------------------------------------------------------------*/
+/* Store the existing LIBDEFs to reactivate them at the end          */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC"
+"QLIBDEF ISPLLIB TYPE(LTYP) ID(LID)"
+LDEF? = RC=0
+"QLIBDEF ISPPLIB TYPE(PTYP) ID(PID)"
+PDEF? = RC=0
+"QLIBDEF ISPSLIB TYPE(STYP) ID(SID)"
+SDEF? = RC=0
+"QLIBDEF ISPTLIB TYPE(TTYP) ID(TID)"
+TDEF? = RC=0
+"QLIBDEF ISPMLIB TYPE(MTYP) ID(MID)"
+MDEF? = RC=0
+
+/*-------------------------------------------------------------------*/
+/* Let's ensure that we have an ISPF environment by executing an     */
+/* ISPF function.  If there is no ISPF environment, a message will   */
+/* be issued saving us the task of having to do so ]]  If any        */
+/* subsequent ISPF error occurs, then let ISPF handle it.            */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";
+"CONTROL ERRORS CANCEL";
+if (rc ^= 0)
+then call ErrorExit 'A valid ISPF environment does not exist';
+
+/*-------------------------------------------------------------------*/
+/* LIBDEF message library and set COPYRIGHT msg                      */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";                                           /* @L4A */
+libnames = "";                                               /* @L4A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq1.0;                                        /* @L4A */
+    libname  = hlq1.k".TKO2M"language;                       /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (smpe_mode = 1)                     /* SMPE libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq2.0;                                        /* @L4A */
+    libname  = hlq2.k".TKO2M"language;                       /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (rte_mode = 1)                      /* RTE libs              @L4A */
+then                                                         /* @L5C */
+  do k = 1 to rte_tab4.0;                                    /* @L5C */
+    if (rte_tab4.lang.k = language ) & ,                     /* @L5C */
+       (rte_tab4.type.k = 'ISPMLIB')                         /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        libname  = rte_tab4.dsn.k;                           /* @L5C */
+        libnames = libnames "'"libname"'";                   /* @L5C */
+      end;                                                   /* @L5C */
+  end;                                                       /* @L5C */
+
+if (libnames ^= "")                    /* Libdef                @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    "LIBDEF ISPMLIB DATASET ID("libnames")";                 /* @L4C */
+    libdef_mlib_used = 1;                                    /* @L4A */
+  end;                                                       /* @L4A */
+
+"LOG MSG(FPEU999)";                    /* COPYRIGHT msg              */
+
+/*-------------------------------------------------------------------*/
+/* Determine whether the ALTLIB command is available.  If so, use it */
+/* to define an application level EXEC library.  If not, we assume   */
+/* that the EXEC library has been correctly pre-allocated. If ALTLIB */
+/* fails, TSO/E will issue a message so we can exit immediately.     */
+/*-------------------------------------------------------------------*/
+
+address "TSO";
+libnames = "";                                               /* @L4A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq1.0;                                        /* @L4A */
+    libname  = hlq1.k".TKO2EXEC";                            /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (smpe_mode = 1)                     /* SMPE libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq2.0;                                        /* @L4A */
+    libname  = hlq2.k".TKO2EXEC";                            /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (rte_mode = 1)                      /* RTE libs              @L4A */
+then                                                         /* @L5C */
+  do k = 1 to rte_tab4.0;                                    /* @L5C */
+    if (rte_tab4.lang.k = 'COM'    ) & ,                     /* @L5C */
+       (rte_tab4.type.k = 'TSOEXEC')                         /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        libname  = rte_tab4.dsn.k;                           /* @L5C */
+        libnames = libnames "'"libname"'";                   /* @L5C */
+      end;                                                   /* @L5C */
+  end;                                                       /* @L5C */
+
+"ALTLIB DISPLAY QUIET";                /* Altlib                     */
+if (rc = 0)
+then
+  do;
+    if (libnames ^= "")                                      /* @L4A */
+    then                                                     /* @L4A */
+      do;                                                    /* @L4A */
+        "ALTLIB ACTIVATE APPL(EXEC) DATASET("libnames")";    /* @L4C */
+        if (rc = 0)                                          /* @L4C */
+        then altlib_exe_used = 1;                            /* @L4C */
+        else call ErrorExit 'TSO command ALTLIB did not work';
+      end;                                                   /* @L4A */
+  end;
+
+/*-------------------------------------------------------------------*/
+/* Define an application level CLIST library                         */
+/*-------------------------------------------------------------------*/
+
+address "TSO";                                               /* @L4A */
+libnames = "";                                               /* @L4A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq1.0;                                        /* @L4A */
+    libname  = hlq1.k".TKANCLI";                             /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (smpe_mode = 1)                     /* SMPE libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq2.0;                                        /* @L4A */
+    libname  = hlq2.k".TKANCLI";                             /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (rte_mode = 1)                      /* RTE libs              @L4A */
+then                                                         /* @L5C */
+  do k = 1 to rte_tab4.0;                                    /* @L5C */
+    if (rte_tab4.lang.k = 'COM'    ) & ,                     /* @L5C */
+       (rte_tab4.type.k = 'TSOCLIS')                         /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        libname  = rte_tab4.dsn.k;                           /* @L5C */
+        libnames = libnames "'"libname"'";                   /* @L5C */
+      end;                                                   /* @L5C */
+  end;                                                       /* @L5C */
+
+"ALTLIB DISPLAY QUIET";                /* Altlib                @L4A */
+if (rc = 0)                                                  /* @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    if (libnames ^= "")                                      /* @L4A */
+    then                                                     /* @L4A */
+      do;                                                    /* @L4A */
+        "ALTLIB ACTIVATE APPL(CLIST) DATASET("libnames")";   /* @L4A */
+        if (rc = 0)                                          /* @L4A */
+        then altlib_cli_used = 1;                            /* @L4A */
+        else call ErrorExit 'TSO command ALTLIB did not work';
+      end;                                                   /* @L4A */
+  end;
+
+/*-------------------------------------------------------------------*/
+/* Perform environment checks and exit if any problems are found.    */
+/* This function is controlled by the variable <checks> which can    */
+/* be modified by the installation (see user modificable section).   */
+/*-------------------------------------------------------------------*/
+
+if (checks = 1)
+then
+  if ^(Check_Environment())
+  then call ErrorExit 'Any environment problems found';
+
+/*-------------------------------------------------------------------*/
+/* LIBDEF table library and read the variables                       */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";
+libnames = "";                                               /* @L4A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq1.0;                                        /* @L4A */
+    libname  = hlq1.k".TKO2T"language;                       /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (smpe_mode = 1)                     /* SMPE libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq2.0;                                        /* @L4A */
+    libname  = hlq2.k".TKO2T"language;                       /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (rte_mode = 1)                      /* RTE libs              @L4A */
+then                                                         /* @L5C */
+  do k = 1 to rte_tab4.0;                                    /* @L5C */
+    if (rte_tab4.lang.k = language ) & ,                     /* @L5C */
+       (rte_tab4.type.k = 'ISPTLIB')                         /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        libname  = rte_tab4.dsn.k;                           /* @L5C */
+        libnames = libnames "'"libname"'";                   /* @L5C */
+      end;                                                   /* @L5C */
+  end;                                                       /* @L5C */
+
+if (libnames ^= "")                    /* Libdef                @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    "LIBDEF ISPTLIB DATASET ID("libnames")";                 /* @L4C */
+    libdef_tlib_used = 1;                                    /* @L4A */
+  end;                                                       /* @L4A */
+
+/* Read variable ilinks from ISPF table lib ISPTLIB                  */
+table = "FPEFVARS";
+"TBOPEN" table "NOWRITE SHARE";
+"TBSKIP" table;
+"TBEND"  table;
+
+/*-------------------------------------------------------------------*/
+/* Determine whether we need to LIBDEF the load library by checking  */
+/* what was specified during customization (Var ilinks).             */
+/* The runtime library is not LIBDEFed if it is in the               */
+/* system linklist (ilinks = 1).                                     */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";                                           /* @L4A */
+libnames = "";                                               /* @L4A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq1.0;                                        /* @L4A */
+    libname  = hlq1.k".TKANMOD";                             /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if ((smpe_mode = 1) & (ilinks = 0))    /* SMPE libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq2.0;                                        /* @L4A */
+    libname  = hlq2.k".TKANMOD";                             /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (rte_mode = 1)                      /* RTE libs              @L6C */
+then                                                         /* @L5C */
+  do k = 1 to rte_tab4.0;                                    /* @L5C */
+    if (rte_tab4.lang.k = 'COM'    ) & ,                     /* @L5C */
+       (rte_tab4.type.k = 'ISPLLIB')                         /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        libname  = rte_tab4.dsn.k;                           /* @L5C */
+        libnames = libnames "'"libname"'";                   /* @L5C */
+      end;                                                   /* @L5C */
+  end;                                                       /* @L5C */
+
+if (db2_mode = 1)                      /* DB2 libs              @L7A */
+then                                                         /* @L7A */
+  do k = 1 to lib4.0;                                        /* @L7A */
+    libname  = lib4.k;                                       /* @L7A */
+    libnames = libnames "'"libname"'";                       /* @L7A */
+  end;                                                       /* @L7A */
+
+if (libnames ^= "")                    /* Libdef                @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    "LIBDEF ISPLLIB DATASET ID("libnames")";                 /* @L4C */
+    libdef_llib_used = 1;                                    /* @L4A */
+  end;                                                       /* @L4A */
+
+/*-------------------------------------------------------------------*/
+/* LIBDEF panel library                                              */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";                                           /* @L4A */
+libnames = "";                                               /* @L4A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq1.0;                                        /* @L4A */
+    libname  = hlq1.k".TKO2P"language;                       /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (smpe_mode = 1)                     /* SMPE libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq2.0;                                        /* @L4A */
+    libname  = hlq2.k".TKO2P"language;                       /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (rte_mode = 1)                      /* RTE libs              @L4A */
+then                                                         /* @L5C */
+  do k = 1 to rte_tab4.0;                                    /* @L5C */
+    if (rte_tab4.lang.k = language ) & ,                     /* @L5C */
+       (rte_tab4.type.k = 'ISPPLIB')                         /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        libname  = rte_tab4.dsn.k;                           /* @L5C */
+        libnames = libnames "'"libname"'";                   /* @L5C */
+      end;                                                   /* @L5C */
+  end;                                                       /* @L5C */
+
+if (libnames ^= "")                    /* Libdef                @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    "LIBDEF ISPPLIB DATASET ID("libnames")";                 /* @L4C */
+    libdef_plib_used = 1;                                    /* @L4A */
+  end;                                                       /* @L4A */
+
+/*-------------------------------------------------------------------*/
+/* LIBDEF skeleton library                                           */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";                                           /* @L4A */
+libnames = "";                                               /* @L4A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq1.0;                                        /* @L4A */
+    libname  = hlq1.k".TKO2SLIB";                            /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (smpe_mode = 1)                     /* SMPE libs             @L4A */
+then                                                         /* @L4A */
+  do k = 1 to hlq2.0;                                        /* @L4A */
+    libname  = hlq2.k".TKO2SLIB";                            /* @L4A */
+    libnames = libnames "'"libname"'";                       /* @L4A */
+  end;                                                       /* @L4A */
+
+if (rte_mode = 1)                      /* RTE libs              @L4A */
+then                                                         /* @L5C */
+  do k = 1 to rte_tab4.0;                                    /* @L5C */
+    if (rte_tab4.lang.k = 'COM'    ) & ,                     /* @L5C */
+       (rte_tab4.type.k = 'ISPSLIB')                         /* @L5C */
+    then                                                     /* @L5C */
+      do;                                                    /* @L5C */
+        libname  = rte_tab4.dsn.k;                           /* @L5C */
+        libnames = libnames "'"libname"'";                   /* @L5C */
+      end;                                                   /* @L5C */
+  end;                                                       /* @L5C */
+
+if (libnames ^= "")                    /* Libdef                @L4A */
+then                                                         /* @L4A */
+  do;                                                        /* @L4A */
+    "LIBDEF ISPSLIB DATASET ID("libnames")";                 /* @L4C */
+    libdef_slib_used = 1;                                    /* @L4A */
+  end;                                                       /* @L4A */
+
+/*-------------------------------------------------------------------*/
+/* Define list of load libs and load lib group for IRF               */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";                                           /* @L6A */
+k = 0;                                 /* Init llib_tab         @L6A */
+
+if (sclm_mode = 1)                     /* SCLM libs             @L6A */
+then                                                         /* @L6A */
+  do i = 1 to hlq1.0;                                        /* @L6A */
+    libname  = hlq1.i".TKANMOD";                             /* @L6A */
+    k = k + 1;                                               /* @L6A */
+    llib_tab.dsn.k = libname;                                /* @L6A */
+    llib_tab.grp.k = "SCLM";                                 /* @31A */
+  end;                                                       /* @L6A */
+
+if ((smpe_mode = 1) & (ilinks = 0))    /* SMPE libs             @L6A */
+then                                                         /* @L6A */
+  do i = 1 to hlq2.0;                                        /* @L6A */
+    libname  = hlq2.i".TKANMOD";                             /* @L6A */
+    k = k + 1;                                               /* @L6A */
+    llib_tab.dsn.k = libname;                                /* @L6A */
+    llib_tab.grp.k = "SMPE";                                 /* @31A */
+  end;                                                       /* @L6A */
+
+if (rte_mode = 1)                      /* RTE libs              @L6A */
+then                                                         /* @L6A */
+  do i = 1 to rte_tab4.0;                                    /* @L6A */
+    if (rte_tab4.lang.i = 'COM'    ) & ,                     /* @L6A */
+       (rte_tab4.type.i = 'ISPLLIB')                         /* @L6A */
+    then                                                     /* @L6A */
+      do;                                                    /* @L6A */
+        libname  = rte_tab4.dsn.i;                           /* @L6A */
+        k = k + 1;                                           /* @L6A */
+        llib_tab.dsn.k = libname;                            /* @L6A */
+        llib_tab.grp.k = "RTE";                              /* @31A */
+      end;                                                   /* @L6A */
+  end;                                                       /* @L6A */
+
+if (db2_mode = 1)                      /* DB2 libs              @31A */
+then                                                         /* @31A */
+  do i = 1 to lib4.0;                                        /* @31A */
+    libname  = lib4.i;                                       /* @31A */
+    k = k + 1;                                               /* @31A */
+    llib_tab.dsn.k = libname;                                /* @31A */
+    llib_tab.grp.k = "DB2";                                  /* @31A */
+  end;                                                       /* @31A */
+
+llib_tab.dsn.0 = k;                    /* Number of load libs   @L6A */
+
+/*-------------------------------------------------------------------*/
+/* Trace list of load libs                                      @31A */
+/*-------------------------------------------------------------------*/
+
+if (trace_flag = 1)                                          /* @31A */
+then                                                         /* @31A */
+  do;                                                        /* @31A */
+    trace_rec = ' ';                                         /* @31A */
+    say trace_rec;                                           /* @31A */
+    trace_rec = 'List of allocated LMod libraries ';         /* @31A */
+    trace_rec = trace_rec!!'(Group Dsn):';                   /* @31A */
+    say trace_rec;                                           /* @31A */
+
+    do i = 1 to llib_tab.dsn.0;                              /* @31A */
+      trace_rec = substr(llib_tab.grp.i,1,4);                /* @31A */
+      trace_rec = trace_rec llib_tab.dsn.i;                  /* @31A */
+      say trace_rec;                                         /* @31A */
+    end;                                                     /* @31A */
+  end;                                                       /* @31A */
+
+/*-------------------------------------------------------------------*/
+/* Set PROFILE var OSTEPLIB from list of load libs              @31C */
+/*-------------------------------------------------------------------*/
+/* Notes:                                                            */
+/* - ISPF vars OSTEPLnn are used by Interactive Report Facility @31C */
+/*   (IRF) to set the STEPLIB in the generated JCL.                  */
+/* - Up to PE V210 OSTEPLIB was defined by the installation          */
+/*   utility FPEFVARS and stored in lib SFPETENU.                    */
+/* - OMEGAMON XE DB2 PE V3 does not use FPEFVARS.                    */
+/*   The load lib DSN of the RTE is defined by ICAT.                 */
+/*   This RTE load lib DSN and other LMod libs are available    @31C */
+/*   in this EXEC and will be used to define the variables      @31C */
+/*   OSTEPLnn in the PROFILE.                                   @31C */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";                                           /* @L6A */
+
+/* Set PROFILE name for VPUT command                            @31A */
+parse upper arg tmp1 parms "/" tmp2;                         /* @L6A */
+if (wordpos("NOAPPL",parms) = 0)                             /* @L6A */
+then cmd_opt = "MODE(FSCR) NEWAPPL(FPEF) PASSLIB";           /* @L6A */
+else cmd_opt = "";                                           /* @L6A */
+
+/* Set all PROFILE variables OSTEPLnn (Max = 10)                @31A */
+do i = 1 to 10;                                              /* @31A */
+  /* Format a 2 digit number with leading zeros like "01"       @31A */
+  num = 100 + i;                                             /* @31A */
+  nu3 = format(num,3,0);                                     /* @31A */
+  nu2 = substr(nu3,2,2);                                     /* @31A */
+
+  /* Set variable name "OSTEPLnn"                               @31A */
+  cmd_var = "OSTEPL"!!nu2;                                   /* @31A */
+
+  /* Set variable value / dsn or "???" for undefined            @31A */
+  if (i     <= llib_tab.dsn.0) & ,                           /* @31A */
+     ("DB2" ^= llib_tab.grp.i)                               /* @31A */
+  then cmd_val = llib_tab.dsn.i;                             /* @31A */
+  else cmd_val = "???";                                      /* @31A */
+
+  /* Parameter string for DGOFSERV "PROFVPUT OSTEPLnn dsn"      @31A */
+  cmd_par = "PROFVPUT" cmd_var cmd_val;                      /* @31C */
+
+  /* Set PROFILE variable OSTEPLnn                              @31A */
+  "SELECT CMD(%DGOFSERV" cmd_par ")" cmd_opt;                /* @L6A */
+  if (rc > 0)                                                /* @L6A */
+  then                                                       /* @L6A */
+    do;                                                      /* @L6A */
+      cmd_msg = 'Command DGOFSERV PROFVPUT did not work';    /* @L6A */
+      call ErrorExit cmd_msg;                                /* @L6A */
+    end;                                                     /* @L6A */
+end;                                                         /* @31A */
+
+/*-------------------------------------------------------------------*/
+/* Invoke the requested application                                  */
+/*-------------------------------------------------------------------*/
+
+address "ISPEXEC";                                           /* @L4A */
+program = "FPEFMAIN";
+
+parse upper arg xeqname parms "/" xeqparms;
+if (xeqname ^= "")
+then program = xeqname;
+command = strip(program xeqparms);
+if (wordpos("NOAPPL",parms) = 0)
+then "SELECT CMD("command") MODE(FSCR) NEWAPPL(FPEF) PASSLIB";
+else interpret "rc = " program"("strip(xeqparms)")";
+
+$rc = rc;
+
+/*-------------------------------------------------------------------*/
+/* Perform the resetting of the environment                          */
+/*-------------------------------------------------------------------*/
+
+/* Use the same subroutine as in error case for clean up        @P3A */
+call ErrorExit $rc;                                          /* @P3A */
+
+/*-------------------------------------------------------------------*/
+/* End of main program                                               */
+/*-------------------------------------------------------------------*/
+
+/*-------------------------------------------------------------------*/
+/* Name  = Check_Environment                                         */
+/* Usage = Perform various environmental checks function             */
+/*-------------------------------------------------------------------*/
+/* Notes = Function returns a "1" if the environment is OK (no       */
+/*         problems found), or a "0" if one or more environmental    */
+/*         problems have been detected.                              */
+/*       = All problems are logged to the user's ISPF log            */
+/*       = The first problem detected is also displayed as a message */
+/*         upon the user's exit from this exec.                      */
+/*       = The following checks are made:                            */
+/*          - Current application should NOT be FPEF                 */
+/*          - ISPF release is supported                              */
+/*          - EXIT & CANCEL commands are in ISPF command table       */
+/*          - EXEC library is available                              */
+/*-------------------------------------------------------------------*/
+
+check_environment: procedure;
+
+  address "ISPEXEC";
+  table = "ISPCMDS";
+  messages = '';
+
+  /* Check application prefix FPEF                                   */
+  /* Msg: FPEF990 The application identifier <1> is incorrect        */
+  "VGET (ZAPPLID) SHARED";
+  if (zapplid = "FPEF")
+  then messages = messages 'FPEF990';
+
+  /* Check ISPF version                                              */
+  /* Msg: FPEF991 This application dialog is executing on an         */
+  /*      unsupported release of ISPF                                */
+  zenvir = "";
+  "VGET (ZENVIR) SHARED";
+  ispf_name = substr(zenvir,1,8);
+  if (ispf_name < "ISPF 3.5")
+  then messages = messages 'FPEF991';
+
+  /* Check for command CANCEL                                        */
+  /* Msg: FPEF992 The ISPF command table is not current              */
+  "TBTOP" table;
+  "TBVCLEAR" table;
+  zctverb = "CANCEL";
+  "TBSCAN" table "ARGLIST(ZCTVERB)";
+  if (rc > 0)
+  then messages = messages 'FPEF992';
+
+  /* Check for command EXIT                                          */
+  /* Msg: FPEF992 The ISPF command table is not current              */
+  "TBTOP" table;
+  "TBVCLEAR" table;
+  zctverb = "EXIT";
+  "TBSCAN" table "ARGLIST(ZCTVERB)";
+  if (rc > 0)
+  then messages = messages 'FPEF992';
+
+  /* Check for existence of EXEC lib                                 */
+  /* Msg: FPEF993 The RKO2EXEC library is not available              */
+  "CONTROL ERRORS RETURN";
+  "SELECT CMD(%DGOFSERV CHECKS)";
+  if (rc ^= 1)
+  then messages = messages 'FPEF993';
+  "CONTROL ERRORS CANCEL";
+
+  /* Log msg ids and set first msg                                   */
+  problems = words(messages);
+  do i = 1 to problems;
+    msgid = word(messages,i);
+    "LOG MSG("msgid")";
+    "SETMSG MSG("msgid") COND";
+  end;
+
+  /* Set return code                                                 */
+  if (problems = 0)
+  then $rc = 1;
+  else $rc = 0;
+
+return $rc;
+
+/*-------------------------------------------------------------------*/
+/* ErrorExit: Used for clean up for normal and error termination     */
+/*-------------------------------------------------------------------*/
+/* If an error was detected in the exec, the argument contains a     */
+/* message, else it contains the return code from the program        */
+/*-------------------------------------------------------------------*/
+
+ErrorExit:
+
+  parse arg text;
+
+  if (datatype(text) = 'CHAR')         /* Err msg text          @P3A */
+  then                                                       /* @P3A */
+    do;                                                      /* @P3A */
+      say text;                                              /* @P3M */
+      $rc = 20;                                              /* @P3A */
+    end;                                                     /* @P3A */
+  else                                 /* Return code           @P3A */
+    $rc = text;                                              /* @P3A */
+
+  address "TSO";
+  if (altlib_exe_used = 1)                                   /* @L4C */
+  then "ALTLIB DEACTIVATE APPL(EXEC)";                       /* @L4C */
+
+  address "TSO";                                             /* @L4A */
+  if (altlib_cli_used = 1)                                   /* @L4A */
+  then "ALTLIB DEACTIVATE APPL(CLIST)";                      /* @L4A */
+
+  address "ISPEXEC";
+  if (libdef_llib_used = 1)                                  /* @L4C */
+  then                                                       /* @P3A */
+    do;                                                      /* @P3A */
+      if LDEF?                                               /* @P3M */
+      then "LIBDEF ISPLLIB &LTYP ID(&LID)";
+      else "LIBDEF ISPLLIB";
+    end;                                                     /* @P3A */
+
+  if (libdef_plib_used = 1)                                  /* @L4A */
+  then                                                       /* @L4A */
+    do;                                                      /* @L4A */
+      if PDEF?
+      then "LIBDEF ISPPLIB &PTYP ID(&PID)";
+      else "LIBDEF ISPPLIB";
+    end;                                                     /* @L4A */
+
+  if (libdef_slib_used = 1)                                  /* @L4A */
+  then                                                       /* @L4A */
+    do;                                                      /* @L4A */
+      if SDEF?
+      then "LIBDEF ISPSLIB &STYP ID(&SID)";                  /* @P3A */
+      else "LIBDEF ISPSLIB";                                 /* @P3A */
+    end;                                                     /* @L4A */
+
+  if (libdef_tlib_used = 1)                                  /* @L4A */
+  then                                                       /* @L4A */
+    do;                                                      /* @L4A */
+      if TDEF?
+      then "LIBDEF ISPTLIB &TTYP ID(&TID)";
+      else "LIBDEF ISPTLIB";
+    end;                                                     /* @L4A */
+
+  if (libdef_mlib_used = 1)                                  /* @L4A */
+  then                                                       /* @L4A */
+    do;                                                      /* @L4A */
+      if MDEF?
+      then "LIBDEF ISPMLIB &MTYP ID(&MID)";
+      else "LIBDEF ISPMLIB";
+    end;                                                     /* @L4A */
+
+  exit $rc;
+

@@ -1,0 +1,176 @@
+PROC 0 PANEL() PLIB() CLIB() SYSX() SLIB() MLIB() LLIB() TLIB() DEBUG()
+/*********************************************************************/
+/*                                                                   */
+/* LIB: CPAC.CMDPROC(ISPPDF)                                         */
+/* DOC: THIS CLIST ALLOCATES THE FILES REQUIRED BY ISPF AND PDF      */
+/*      AND THEN INVOKES PDF.                                        */
+/*                                                                   */
+/* NOTE: SYSPROC IS FREED AND REALLOCATED TO INCLUDE THE PDF CLIST   */
+/*       DATASET. THIS MAY RESULT IN A DIFFERENT CONCATENATION       */
+/*       THAN EXISTED BEFORE THIS CLIST WAS INVOKED.                 */
+/*                                                                   */
+/*********************************************************************/
+CONTROL NOFLUSH MSG MAIN NOPROMPT
+PROFILE MODE WTPMSG MSGID
+/* FREE FILE(ISPLLIB,ISPPLIB,ISPMLIB,ISPTLIB,ISPSLIB, + */
+/*          ISPTABL,SMPTABL,IPCSPARM,ISPPALT,ISPMALT,ISPILIB) */
+SET &DSNAME = Z.&SYSUID..ISPPROF
+FREE FI(SYSPROC)
+ALLOC FI(SYSPROC) SHR REUSE DA( +
+                         'ED.ISPCLIB'                       /* A00 */ +
+                         'DSNA10.SDSNCLST'             /*DB2 CLIST*/  +
+                         'ADB.SADBCLST'   /*DB2 ADMIN CLIST*/         +
+                 /*      'DGO.SDGOEXEC'                        A03  */+
+                 /*      'QMF.SDSQCLTE'                        A03  */+
+                         'CPAC.CMDPROC'                               +
+                         'CBC.SCCNUTL'                                +
+                         'ISP.SISPCLIB'                               +
+                         'GDDM.SADMSAM'                               +
+                  /*     'SYS1.SICECLIB'                           */ +
+                         'EOY.SEOYCLIB'                               +
+                         'EOX.SEPHCLB1'                               +
+                         'SYS1.SERBCLS'                               +
+                         'TSAS.V2.CLIST'                              +
+                  /*     'TIV.TWS.SEQQCLIB'                    A00 */ +
+                         'ED.TSOCLIB'                      /*  A00 */ +
+                  /*     'P.PROCLIB'                PROD CLIB  A00 */ +
+                  /*     'D.PROCLIB'                           A00 */ +
+                         &CLIB                              /* A00 */ +
+                         )
+ALLOC FI(SYSEXEC) SHR REUSE DA( +
+                  /*     'QMF.SDSQEXCE'                            */ +
+                         'ADB.SADBEXEC'                               +
+                  /*     'DGO.SDGOEXEC'                            */ +
+                         'ISP.SISPEXEC'                               +
+                         'ISF.SISFEXEC'                               +
+                         'SYS1.SBPXEXEC'                    /* A07 */ +
+                         'FMN.SFMNEXEC'                     /* A07 */ +
+                         'IDI.SIDIEXEC'                               +
+                   /*    'IOE.SIOEEXEC'                            */ +
+                         'EOY.SEOYCLIB'                               +
+                         'EOX.SEPHCLB1'                               +
+                         &SYSX                              /* A00 */ +
+                         )
+ALLOC FI(ISPTABL) SHR DA( +
+                         '&DSNAME'                                    +
+                                )
+ALLOC FI(SMPTABL) SHR REUSE DA('&DSNAME.')
+ALLOC FI(ISPLLIB) SHR REUSE DA( +
+                         'ED.ISPLLIB'                       /* A00 */ +
+                   /*    'SOFT.DBA.DSNA10.SDSNEXIT'            A00 */ +
+                         'DSNA10.SDSNLOAD'          /*DB2 MODULES*/   +
+                         'ADB.SADBLLIB'                               +
+                   /*    'QMF.SDSQLOAD'                           */  +
+                   /*    'TIV.TWS.SEQQLMD0'                 A00   */  +
+                         'SYS1.DFQLLIB'                               +
+                         'TSAS.V2.LOAD'                               +
+                   /*    'P.LINKLIB'                           A00 */ +
+                   /*    'D.LINKLIB'                           A00 */ +
+                         &LLIB                              /* A00 */ +
+                         )
+ALLOC FI(ISPPLIB) SHR REUSE DA( +
+                         'ED.ISPPLIBD'                      /* A00 */ +
+                         'ED.ISPPLIB'                       /* A00 */ +
+                         'CPAC.ISPPLIB'                               +
+                         'ISP.SISPPENU'                               +
+                         'DSNA10.SDSNSPFP'                            +
+                         'DSNA10.SDSNPFPE'                            +
+                         'ADB.SADBPLIB'                               +
+                 /*      'QMF.SDSQPLBE'                            */ +
+                 /*      'CBC.SCBCPNL'                             */ +
+                         'GDDM.SADMPNL'                               +
+                         'SYS1.DFQPLIB'                               +
+                         'ISF.SISFPLIB'                               +
+                         'SYS1.SBPXPENU'                    /* A07 */ +
+                         'FMN.SFMNPENU'                     /* A07 */ +
+                         'IDI.SIDIPLIB'                               +
+                         'EOY.SEOYPENU'                               +
+                         'EOX.SEPHPNL1'                               +
+                   /*    'IOE.SIOEPNLE'                            */ +
+                         'TSAS.V2.PLIB'                               +
+                         'SYS1.SERBPENU'                              +
+                  /*     'TIV.TWS.SEQQPENU'                    A00 */ +
+                  /*     'TIV.TWS.SEQQPNL0'                    A00 */ +
+                         'SYS1.SCBDPENU'                              +
+                         'TCPIP.SEZAPENU'                             +
+                  /*     'P.ISPPLIB'                 PROD PLIB A00 */ +
+                         &PLIB                              /* A00 */ +
+                         )
+ALLOC FI(ISPMLIB) SHR REUSE DA( +
+                         'DSNA10.SDSNSPFM'            /* DB2 MSGS*/   +
+                         'ADB.SADBMLIB'                               +
+               /*        'QMF.SDSQMLBE'                      A03  */  +
+               /*        'CBC.SCBCIMG'                            */  +
+                         'ISP.SISPMENU'                               +
+                         'GDDM.SADMMSG'                               +
+                         'SYS1.DFQMLIB'                               +
+                         'ISF.SISFMLIB'                               +
+                         'EOY.SEOYMENU'                               +
+               /*        'IOE.SIOEMSGE'                           */  +
+                         'SYS1.SCBDMENU'                              +
+                         'EOY.SEOYBENU'                               +
+                         'EOX.SEPHMSG1'                               +
+                         'SYS1.SERBMENU'                              +
+                /*       'TIV.TWS.SEQQMSG0'                   A00  */ +
+                         'TCPIP.SEZAMENU'                             +
+                         'IDI.SIDIMLIB'                               +
+                         'TSAS.V2.MLIB'                               +
+                         'SYS1.SBPXMENU'                    /* A07 */ +
+                         'FMN.SFMNMENU'                     /* A07 */ +
+                         'ED.ISPMLIB'                       /* A00 */ +
+                 /*      'P.ISPMLIB'              /* PROD MLIB A00 */ +
+                         &MLIB                              /* A00 */ +
+                         )
+ALLOC FI(IPCSPARM) SHR DA( +
+                         'SYS1.SHASPARM'                              +
+                         'SYS1.PARMLIB')                    /* ??? */
+ALLOC FI(ISPTLIB) SHR REUSE DA( +
+                         '&DSNAME.'                         /* A00 */ +
+                         'DSNA10.SDSNSPFT'             /*DB2 TBLIB */ +
+                         'ADB.SADBTLIB'                /*DB2 ADMIN */ +
+                         'ISP.SISPTENU'                               +
+                         'ISF.SISFTLIB'                               +
+                         'EOY.SEOYTENU'                               +
+                         'EOX.SEPHTBL1'                               +
+                         'SYS1.SERBTENU'                              +
+                         'TSAS.V2.TLIB'                               +
+                /*       'TIV.TWS.SEQQTBL0'                    A00 */ +
+                         'SYS1.SBPXTENU'                    /* A07 */ +
+                         'FMN.SFMNTENU'                     /* A07 */ +
+                         'IDI.SIDITLIB'                     /* A07 */ +
+                         'ED.ISPTLIB'                       /* A00 */ +
+                         &TLIB                              /* A00 */ +
+                         )
+ALLOC FI(ISPSLIB) SHR REUSE DA( +
+                         'DSNA10.SDSNSPFS'            /*DB2 SKLIB */  +
+                         'ADB.SADBSLIB'                               +
+               /*        'QMF.SDSQSLBE'                           */  +
+               /*        'CBC.SCBCSKL'                            */  +
+                         'ISP.SISPSLIB'                               +
+                         'ISP.SISPSENU'                               +
+                         'ISF.SISFSLIB'                               +
+                         'IDI.SIDISLIB'                               +
+                         'TSAS.V2.SLIB'                               +
+                         'FMN.SFMNSLIB'                     /* A07 */ +
+                /*       'TWS851.&SYSNAME..SKELS'              A00 */ +
+                /*       'TIV.TWS.SEQQSKL0'                    A00 */ +
+                /*       'TIV.TWS.SEQQSAMP'                    A00 */ +
+                         'ED.ISPSLIB'                       /* A00 */ +
+                /*       'P.ISPSLIB'                 PROD SLIB A00 */ +
+                         &SLIB                              /* A00 */ +
+                         )
+ALLOC FI(ISPILIB) SHR REUSE DA( +
+                         'ISP.SISPSAMP')
+/* ALLOC FOR QMF */
+/* ALLOC F(ADMGGMAP) DA('QMF.DSQMAPE') SHR REUSE                      */
+/* ALLOC F(ADMCFORM) DA('QMF.DSQCHART') SHR REUSE                     */
+/* ALLOC F(DSQPNLE)  DA('QMF.DSQPNLE')   SHR REUSE                    */
+ALLOC F(DSQPRINT) SYSOUT(X)  RECFM(F,B,A) LRECL(133) BLOCK(1330)
+ALLOC F(DSQDEBUG) SYSOUT(X)  RECFM(F,B,A) LRECL(121) BLOCK(1210)
+/* ALLOC FI(EQQMLIB) SHR REUSE DA('TIV.TWS.SEQQMSG0')             A00 */
+/*                                                           */
+  /* PERFORM CONCATENATION FOR DD NAME CIDTABL    */
+ALLOC FI(CIDTABL) SHR REUSE DA(                                       +
+                         '&DSNAME.'                                   +
+                         )
+ERROR RETURN

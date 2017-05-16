@@ -1,0 +1,59 @@
+/****** REXX *********************************************************/
+/***START OF COPYRIGHT NOTICE*****************************************/
+/*                                                                   */
+/* Proprietary Statement:                                            */
+/*                                                                   */
+/*      5698-SA3                                                     */
+/*      Licensed Materials - Property of IBM                         */
+/*      ý COPYRIGHT IBM CORP. 2000, 2006  All Rights Reserved.       */
+/*                                                                   */
+/*      US Government Users Restricted Rights -                      */
+/*      Use, duplication or disclosure restricted by                 */
+/*      GSA ADP Schedule Contract with IBM Corp.                     */
+/*                                                                   */
+/*      STATUS= HWRE320                                              */
+/*                                                                   */
+/**END OF COPYRIGHT NOTICE********************************************/
+/*********************************************************************/
+/*                                                                   */
+/* DESCRIPTION:  Customization Dialog invocation sample              */
+/*                                                                   */
+/* Before using this member customize the following:                 */
+/*                                                                   */
+/*        1. change 'ING' to the high level qualifier of your        */
+/*           System Automation target libraries                      */
+/*                                                                   */
+/*        2. change 'ING.CUSTOM' to the high level qualifier         */
+/*           of your specific ISPF output table library for          */
+/*           System Automation (DD name AOFTABL)                     */
+/*                                                                   */
+/* Important: AOFTABL data set must be allocated before the REXX can */
+/*            run (see sample INGEDLGA)                              */
+/*                                                                   */
+/* Note: This sample will allocate dynamically all needed datasets.  */
+/*       Further parameters can be specified if this is not          */
+/*       applicable. For more information see documentation.         */
+/*********************************************************************/
+/* Change Code Vrsn Date    Who  Description                         */
+/* ------------------------------------------------------------------*/
+/* $L0=OA14949,SA31,20Jan06,GFG: Customization dialog start procedure*/
+/*********************************************************************/
+INGEDLG:
+
+/*********************************************************************/
+/* Setup high level qualifiers                                       */
+/*********************************************************************/
+  hlqinst = 'TIV.ING'          /* SA z/OS high level qualifier   */
+  hlqcust = 'TSA.RZDGVCED.CUSTOM' /* specific ISPF output table lib */
+
+/*********************************************************************/
+/* Invoke customization dialog start program INGDLG                  */
+/*********************************************************************/
+  EXEC "'"hlqinst".SINGIREX(INGDLG)'",
+       "'HLQ("hlqinst")",
+       "AOFTABL("hlqcust".AOFTABL)'"
+
+/*********************************************************************/
+/* Return to caller                                                  */
+/*********************************************************************/
+Exit 0

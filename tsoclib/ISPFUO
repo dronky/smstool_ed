@@ -1,0 +1,149 @@
+PROC 0 PLIB() CLIB() SYSX() SLIB() MLIB() LLIB() TLIB() DEBUG()
+CONTROL NOFLUSH MSG NOPROMPT
+IF &DEBUG = DEBUG THEN CONTROL LIST SYMLIST CONLIST FLUSH MSG
+SET &DSNAME = Z.&SYSUID..ISPPROF
+/* PERFORM CONCATENATION FOR DD NAME SYSPROC    */
+   FREE FI(SYSPROC)
+ALLOC FI(SYSPROC) SHR REUSE DA(                                       +
+                         'ED.ISPCLIB'                       /* A00 */ +
+                         'DSN910.SDSNCLST'             /*DB2 CLIST*/  +
+                         'ADB.SADBCLST'          /*DB2 ADMIN CLIST*/  +
+                         'CPAC.CMDPROC'                               +
+                 /*      'SOFT.DBA.DSN910.SDSNCLST'            A27 */ +
+                 /*      'SOFT.DBA.DB2.SDSNCLST'               A27 */ +
+                 /*      'QMF.SDSQCLTE'                        A27 */ +
+                 /*      'ELA.SELACLST'                            */ +
+                         'EOY.SEOYCLIB'                               +
+                         'CBC.SCCNUTL'                                +
+                         'ISP.SISPCLIB'                               +
+                         'GDDM.SADMSAM'                               +
+                         'FMN.SFMNCLIB'                               +
+                  /*     'SYS1.SICECLIB'                           */ +
+                         'ED.TSOCLIB'                       /* A00 */ +
+                  /*     'P.PROCLIB'                 PROD CLIB A00 */ +
+                  /*     'D.PROCLIB'                           A00 */ +
+                         &CLIB                              /* A00 */ +
+                         )
+  /* PERFORM CONCATENATION FOR DD NAME ISPLLIB    */
+ALLOC FI(ISPLLIB) SHR REUSE DA(                                       +
+                         'ED.ISPLLIB'                          A00 */ +
+                   /*    'SOFT.DBA.DSN910.SDSNEXIT'            A27 */ +
+                         'DSN910.SDSNLOAD'                  /* A27 */ +
+                         'ADB.SADBLLIB'                               +
+                   /*    'QMF.SDSQLOAD'                            */ +
+                         'SYS1.DFQLLIB'                               +
+                   /*    'P.LINKLIB'                        /* A00 */ +
+                   /*    'D.LINKLIB'                        /* A00 */ +
+                         &LLIB                              /* A00 */ +
+                         )
+  /* PERFORM CONCATENATION FOR DD NAME ISPPLIB    */
+ALLOC FI(ISPPLIB) SHR REUSE DA(                                       +
+                         'ED.ISPPLIBU'                      /* A00 */ +
+                         'ED.ISPPLIB'                       /* A00 */ +
+                         'DSN910.SDSNSPFP'                            +
+                         'DSN910.SDSNPFPE'                            +
+                         'ADB.SADBPLIB'                               +
+                         'CPAC.ISPPLIB'                               +
+                         'ISP.SISPPENU'                               +
+                   /*    'QMF.SDSQPLBE'                        A27 */ +
+                         'MQM.SCSQPNLE'                               +
+                         'ISF.SISFPLIB'                               +
+                         'EOY.SEOYPENU'                               +
+                    /*   'EUV.SEUVPNL'                             */ +
+                    /*   'CBC.SCBCPNL'                             */ +
+                         'GDDM.SADMPNL'                               +
+                         'SYS1.DFQPLIB'                               +
+                    /*   'IOE.SIOEPNLE'                            */ +
+                    /*   'SYS1.SISTPNL0'                           */ +
+                    /*   'SYS1.SISTPNL1'                           */ +
+                         'TCPIP.SEZAPENU'                             +
+                    /*   'SYS1.SICEPENU'                           */ +
+                         'IDI.SIDIPLIB'                               +
+                         'FMN.SFMNPENU'                               +
+                    /*   'P.ISPPLIB'                 PROD PLIB A00 */ +
+                         &PLIB                              /* A00 */ +
+                         )
+  /* PERFORM CONCATENATION FOR DD NAME ISPMLIB    */
+ALLOC FI(ISPMLIB) SHR REUSE DA(                                       +
+                         'MQM.SCSQMSGE'                               +
+                         'DSN910.SDSNSPFM'            /* DB2 MSGS*/   +
+                         'ADB.SADBMLIB'                               +
+                  /*     'QMF.SDSQMLBE'                        A27 */ +
+                         'ISF.SISFMLIB'                               +
+                         'EOY.SEOYMENU'                               +
+                         'EOY.SEOYBENU'                               +
+                  /*     'EUV.SEUVMSG'                             */ +
+                  /*     'CBC.SCBCIMG'                              */+
+                         'ISP.SISPMENU'                               +
+                         'GDDM.SADMMSG'                               +
+                         'SYS1.DFQMLIB'                               +
+                  /*     'IOE.SIOEMSGE'                            */ +
+                  /*     'SYS1.SISTMSG0'                           */ +
+                         'TCPIP.SEZAMENU'                             +
+                  /*     'SYS1.SICEMENU'                           */ +
+                         'IDI.SIDIMLIB'                               +
+                         'FMN.SFMNMENU'                               +
+                         'ED.ISPMLIB'                       /* A00 */ +
+                  /*     'P.ISPMLIB'                 PROD MLIB A00 */ +
+                         &MLIB                              /* A00 */ +
+                         )
+  /* PERFORM CONCATENATION FOR DD NAME ISPSLIB    */
+ALLOC FI(ISPSLIB) SHR REUSE DA(                                       +
+                         'DSN910.SDSNSPFS'                  /* A27 */ +
+                         'ADB.SADBSLIB'                               +
+                 /*      'QMF.SDSQSLBE'                        A27 */ +
+                         'ISF.SISFSLIB'                               +
+                 /*      'CBC.SCBCSKL'                            */  +
+                         'ISP.SISPSLIB'                               +
+                         'ISP.SISPSENU'                               +
+                  /*     'SYS1.SICESLIB'                           */ +
+                         'IDI.SIDISLIB'                               +
+                         'FMN.SFMNSLIB'                               +
+                         'ED.ISPSLIB'                       /* A00 */ +
+                  /*     'P.ISPSLIB'                 PROD SLIB A00 */ +
+                         &SLIB                              /* A00 */ +
+                         )
+  /* PERFORM CONCATENATION FOR DD NAME ISPTLIB    */
+ALLOC FI(ISPTLIB) SHR REUSE DA(                                       +
+                         '&DSNAME.'                         /* A00 */ +
+                         'DSN910.SDSNSPFT'             /*DB2 TBLIB */ +
+                         'ADB.SADBTLIB'                /*DB2 ADMIN */ +
+                         'ISF.SISFTLIB'                               +
+                         'EOY.SEOYTENU'                               +
+                         'ISP.SISPTENU'                               +
+                         'TCPIP.SEZAPENU'                             +
+                  /*     'SYS1.SICETLIB'                           */ +
+                         'IDI.SIDITLIB'                               +
+                         'FMN.SFMNTENU'                               +
+                         'ED.ISPTLIB'                       /* A00 */ +
+                         &TLIB                              /* A00 */ +
+                         )
+  /* PERFORM CONCATENATION FOR DD NAME SYSEXEC    */
+ALLOC FI(SYSEXEC) SHR REUSE DA(                                       +
+                         'ADB.SADBEXEC'                               +
+                  /*     'QMF.SDSQEXCE'                        A27 */ +
+                         'ISF.SISFEXEC'                               +
+                         'EOY.SEOYCLIB'                               +
+                  /*     'EUV.SEUVEXEC'                            */ +
+                         'ISP.SISPEXEC'                               +
+                  /*     'IOE.SIOEEXEC'                            */ +
+                         'IDI.SIDIEXEC'                               +
+                         'FMN.SFMNEXEC'                               +
+                         &SYSX                              /* A00 */ +
+                         )
+/* ALLOC FOR QMF */
+/* ALLOC F(ADMGGMAP) DA('QMF.DSQMAPE') SHR REUSE        A00 */
+/* ALLOC F(ADMCFORM) DA('QMF.DSQCHART') SHR REUSE       A00 */
+/* ALLOC F(DSQPNLE)  DA('QMF.DSQPNLE')   SHR REUSE      A00 */
+ALLOC F(DSQPRINT) SYSOUT(X)  RECFM(F,B,A) LRECL(133) BLOCK(1330)
+ALLOC F(DSQDEBUG) SYSOUT(X)  RECFM(F,B,A) LRECL(121) BLOCK(1210)
+/*                                                           */
+  /* PERFORM CONCATENATION FOR DD NAME ISPTABL    */
+ALLOC FI(ISPTABL) SHR REUSE DA('&DSNAME.')
+  /* PERFORM CONCATENATION FOR DD NAME CIDTABL    */
+ALLOC FI(CIDTABL) SHR REUSE DA(                                       +
+                         '&DSNAME.'                                   +
+                         )
+  /* PERFORM CONCATENATION FOR DD NAME SMPTABL     */
+ALLOC FI(SMPTABL) SHR REUSE DA('&DSNAME.')
+ERROR RETURN

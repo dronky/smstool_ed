@@ -1,0 +1,21 @@
+/*   REXX   */
+ARG num
+x = outtrap('line.')
+"NETSTAT TELNET (LUNAME TCP00" !! num !! ")"
+x = outtrap('off')
+n = line.0 - 1
+IF n < 7 THEN
+  DO
+    SAY 'Luname' TCP00 !! num 'not found.'
+    exit 8
+  END
+DO i = 7 TO n
+  ipw = word(line.i,1)
+  IF ipw = 'EZZ2803I' THEN
+    DO
+      ipw = word(line.i,3)
+      len = index(ipw,'..') - 1
+      SAY 'IP:' substr(ipw,1,len)
+    END
+END
+exit 0

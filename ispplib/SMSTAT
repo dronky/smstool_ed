@@ -21,13 +21,13 @@ _ TYPE(INPUT) INTENS(HIGH) COLOR(TURQ) HILITE(USCORE)
                                                                                %
 )INIT
 .CURSOR = ST
-&SYSDS='A09.TS'
-&TEMPDS='A09.TMP'
+&SYSDS='ED.SMSTOOL.SYS' /* DS which contain systems list */
+&TEMPDS='A09.TMP'       /* DS which generate system command JCL */
+&LOGDS='ED.SMSTOOL.LOG'
+&OPER=''
 )PROC
 IF (&ST NE '0' & &ST NE 'EXIT' & &SYST NE 'EXIT' & &DISK NE 'EXIT')
   *REXX(ST,DISK,SYST,SYSDS,TEMPDS)
-  /*SYSDS='A09.TS'        DS which contain systems list */
-  /*TEMPDS='A09.TMP'      DS which generate system command JCL */
   CHK=0              /* used for flag excluded systems */
   LAMPA=0            /* bool for flagging full/empty syst var */
   if ST = 'OFF' ! ST = 'OF' then
@@ -49,8 +49,9 @@ IF (&ST NE '0' & &ST NE 'EXIT' & &SYST NE 'EXIT' & &DISK NE 'EXIT')
   if syst/='' then
   do
   lampa=1
-    do i = 1 by 1 while syst <> ''
-      parse var syst sysmass.i ',' syst
+  systmp = syst
+    do i = 1 by 1 while systmp <> ''
+      parse var systmp sysmass.i ',' systmp
     end
     sysmass.0 = i-1
     /*IF SYSTEMS EXCLUDED*/
@@ -130,6 +131,11 @@ IF (&ST NE '0' & &ST NE 'EXIT' & &SYST NE 'EXIT' & &DISK NE 'EXIT')
   DROP SYSMASS
   DROP LAMPA
   DROP CHK
+  *ENDREXX
+  &OPER='STA'
+  *REXX(ST,DISK,SYST,OPER,LOGDS,(SMSLOG#))
+  &OPER=''
+  *REXX(SYST)
   DROP SYST
   *ENDREXX
 )HELP

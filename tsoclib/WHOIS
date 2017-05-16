@@ -1,0 +1,60 @@
+/* ÏÅÐÅÏÈÑÀÍÎ ÈÇ OS/370 ÏÎ ÑËÓ×ÀÞ ÑÎÂÅÐØÅÍÑÒÂÀ                          00001000
+PROC 1 USER  /* B ÏOËE KOM. ==> TSO OLNTEST1 YYY     */                 00010000
+CONTROL MAIN,NOLIST,NOMSG,NOCONLIST                                     00020000
+IF &LENGTH(&USER) GT 8 THEN DO                                          00030000
+  SET &MESS= ÄËÈHA ÈMEHÈ ÏPEBÛCÈËA 8 CÈMBOËOB                           00040000
+  IF &SYSENV = FORE THEN +                                              00050000
+    WRITE &MESS                                                         00060000
+  ELSE +                                                                00070000
+    SE '&MESS'                                                          00080000
+  EXIT                                                                  00090000
+  END                                                                   00100000
+                                                                        00110000
+ERROR   /* BCTPETÈB KOM.ERROR CLIST ÇAÏOMÈHAET HÈÆECËEÄ.    */ +        00120000
+        /* ÁËOK B ÏAMßTÈ ,K KOT. OÁPAÙ-Cß B CËY×AE BOÇHÈKHO */ +        00130000
+        /* BEHHÈß OØÈÁKÈ ÏPÈ BÛÏOËHEHÈÈ KAÆÄOÉ KOM. CLIST   */ +        00140000
+    DO                                                                  00150000
+      SET &LCC=&LASTCC                                                  00160000
+      IF  &LCC=400 THEN DO /* &LCC=400 - KOHEÖ ÔAÉËA WHOISDD */         00170000
+        SET &MESS= ÏOËÜÇOBATEËÜ "&USER" HE HAÉÄEH                       00180000
+        IF &SYSENV = FORE THEN +                                        00190000
+          WRITE &MESS                                                   00200000
+        ELSE +                                                          00210000
+          SE '&MESS'                                                    00220000
+        M5:CLOSFILE WHOISDD                                             00230000
+        FREE DD(WHOISDD)                                                00240000
+        END                                                             00250000
+      ELSE DO /* ÄPYÃÈE KOÄÛ  OØÈÁOK I/O */                             00260000
+        SET &MESS= OØÈÁKA "&LCC" ÏPÈ OÁPAÙEHÈÈ K CÏPABO×HÈKY            00270000
+        IF &SYSENV = FORE THEN +                                        00280000
+          WRITE &MESS                                                   00290000
+        ELSE +                                                          00300000
+          SE '&MESS'                                                    00310000
+        ERROR OFF                                                       00320000
+        FREE DD(WHOISDD)                                                00330000
+        END                                                             00340000
+     EXIT CODE(0)                                                       00350000
+   END      /* OF RECOVERY ROUTINE */                                   00360000
+                                                                        00370000
+ALLOC DD(WHOISDD) DA('D.C00.INFO(USER)') SHR REUSE                      00380000
+OPENFILE WHOISDD INPUT                                                  00390000
+M1:  GETFILE WHOISDD                                                    00400000
+ IF  &STR( &USER) EQ &SUBSTR(3:11,&WHOISDD) THEN DO                     00410002
+   SET &OTD = &SUBSTR(1:2,&WHOISDD)                                     00420000
+   SET &FIO = &SUBSTR(13:33,&WHOISDD)                                   00430000
+   SET &FIO = &FIO                                                      00440000
+   CLOSFILE WHOISDD                                                     00450000
+   OPENFILE WHOISDD INPUT                                               00460000
+   M7: GETFILE WHOISDD                                                  00470000
+      IF &OTD EQ &SUBSTR(1:2,&WHOISDD)  THEN DO                         00480000
+        SET MESS = ÈÄEHTÈÔÈKATOP &USER ÈMEET &FIO +                     00490000
+              OTÄEË &SUBSTR(4:12,&WHOISDD)                              00500001
+        IF &SYSENV = FORE THEN +                                        00510000
+          WRITE &MESS                                                   00520000
+        ELSE +                                                          00530000
+          SE '&MESS'                                                    00540000
+        GOTO M5                                                         00550000
+      END                                                               00560000
+   GOTO M7                                                              00570000
+ END                                                                    00580000
+GOTO M1                                                                 00590000

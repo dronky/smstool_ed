@@ -1,0 +1,3 @@
+ /* REXX */                                                             00001003
+ ARG RETCODE                                                            00002036
+  EXIT RETCODE                                                          00003038

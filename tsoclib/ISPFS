@@ -1,0 +1,198 @@
+PROC 0 PANEL() PLIB() CLIB() SYSX() SLIB() MLIB() LLIB() TLIB() DEBUG()
+/*********************************************************************/
+/*                                                                   */
+/* 5751-CS9                                                         */
+/* COPYRIGHT IBM CORP. 1996, 2011                       */
+/*                                                                   */
+/* LIB: CPAC.CMDPROC(ISPPDF)                                         */
+/* DOC: THIS CLIST ALLOCATES THE FILES REQUIRED BY ISPF AND PDF      */
+/*      AND THEN INVOKES PDF.                                        */
+/*                                                                   */
+/* NOTE: SYSPROC IS FREED AND REALLOCATED TO INCLUDE THE PDF CLIST   */
+/*       DATASET. THIS MAY RESULT IN A DIFFERENT CONCATENATION       */
+/*       THAN EXISTED BEFORE THIS CLIST WAS INVOKED.                 */
+/*                                                                   */
+/*********************************************************************/
+CONTROL NOFLUSH NOMSG MAIN
+PROFILE MODE WTPMSG MSGID
+SET &DSNAME =Z.&SYSUID..ISPPROF
+/*FREE FILE(ISPLLIB,ISPPLIB,ISPMLIB,ISPTLIB,ISPSLIB, +  */
+/*          ISPPROF,ISPTABL,SMPTABL,IPCSPARM,ISPPALT,ISPMALT,ISPILIB)  */
+   FREE FI(SYSPROC)                                     /*  A00 */
+ALLOC FI(SYSPROC) SHR DA( +
+                         &CLIB                              /* A00 */+
+                         'ED.ISPCLIB'                       /* A00 */+
+                         'TSAS.V2.CLIST'                             +
+                         'CPAC.CMDPROC'                               +
+                         'SYS1.SBLSCLI0'                              +
+                         'ABJ.SABJCLST'                               +
+                         'REXX.SFANCMD'                               +
+                         'REXX.SEAGCMD'                               +
+                         'FMN.SFMNCLIB'                               +
+                         'GIM.SGIMCLS0'                               +
+                         'ISP.SISPCLIB'                               +
+                         'EOY.SEOYCLIB'                               +
+                         'EOX.SEPHCLB1'                               +
+                         'SYS1.DGTCLIB'                               +
+                         'SYS1.SERBCLS'                               +
+                         'GDDM.SADMSAM'                               +
+                         'FFST.SEPWCENU'                              +
+                         'SYS1.HRFCLST'                               +
+                         'SYS1.SBDTCLI0'                              +
+                         'CBC.SCCNUTL'                                +
+                         'ICQ.ICQCCLIB'                               +
+                         'SYS1.SCBDCLST'                              +
+                         'ED.TSOCLIB'                       /* A00 */ +
+                         'TIV.TWS.SEQQCLIB'                           +
+                         'CSF.SCSFCLI0')
+/*FREE FI(SYSEXEC)         */
+ALLOC FI(SYSEXEC) SHR DA( +
+                         &SYSX                              /* A00 */ +
+             /*          'MQM.SCSQEXEC'                            */ +
+                         'IDI.SIDIEXEC'                               +
+                         'FMN.SFMNEXEC'                               +
+                         'ISP.SISPEXEC'                               +
+                         'EOY.SEOYCLIB'                               +
+                         'EOX.SEPHCLB1'                               +
+                         'SYS1.SEDGEXE1'                              +
+                         'GLD.SGLDEXEC'                               +
+                         'SYS1.SBPXEXEC'                              +
+                         'AOP.SAOPEXEC'                               +
+                         'FFST.SEPWSRC1'                              +
+                         'IOE.SIOEEXEC'                               +
+                         'ISF.SISFEXEC'                               +
+                         'TCPIP.SEZAEXEC'                             +
+                         'EUVF.SEUVFEXC')
+CONTROL MSG
+ERROR EXIT
+IF &PANEL = &STR() THEN +
+  SET &PNL = PANEL(ISP@MSTR)
+ELSE +
+  SET &PNL = PANEL(&PANEL)
+ALLOC FI(ISPTABL) SHR DA( +
+                         '&DSNAME'                                    +
+                                )
+ALLOC FI(SMPTABL) SHR DA('&DSNAME.')
+ALLOC FI(ISPLLIB) SHR DA( +
+                         &LLIB                              /* A00 */ +
+                         'ED.ISPLLIB'                       /* A00 */ +
+                         'TSAS.V2.LOAD'                               +
+                         'TIV.TWS.SEQQLMD0'                           +
+                         'MQM.SCSQAUTH'                               +
+                         'MQM.SCSQLOAD'                               +
+                         'ABJ.SABJMOD1'                               +
+                         'SYS1.DFQLLIB'                               +
+                         'SYS1.DGTLLIB')
+ALLOC FI(ISPPLIB) SHR DA( +
+                         &PLIB                              /* A00 */ +
+                         'ED.ISPPLIBS'                      /* A00 */ +
+                         'ED.ISPPLIB'                       /* A00 */ +
+                         'TSAS.V2.PLIB'                               +
+                         'TIV.TWS.SEQQPENU'                           +
+                         'TIV.TWS.SEQQPNL0'                           +
+                         'CPAC.ISPPLIB'                               +
+                 /*      'MQM.SCSQPNLE'                            */ +
+                         'ISP.SISPPENU'                               +
+                         'ABJ.SABJPLIB'                               +
+                         'REXX.SFANPENU'                              +
+                         'IDI.SIDIPLIB'                               +
+                         'FMN.SFMNPENU'                               +
+                         'SYS1.SHASPNL0'                              +
+                         'GIM.SGIMPENU'                               +
+                         'EOX.SEPHPNL1'                               +
+                         'SYS1.DFQPLIB'                               +
+                         'SYS1.DGTPLIB'                               +
+                         'SYS1.SEDGPENU'                              +
+                         'SYS1.SERBPENU'                              +
+                         'EOY.SEOYPENU'                               +
+                         'SYS1.SBLSPNL0'                              +
+                         'SYS1.SBPXPENU'                              +
+                         'AOP.SAOPPENU'                               +
+                         'GDDM.SADMPNL'                               +
+                         'FFST.SEPWPENU'                              +
+                         'SYS1.HRFPANL'                               +
+                         'SYS1.SBDTPNL0'                              +
+                         'ISF.SISFPLIB'                               +
+                         'TCPIP.SEZAPENU'                             +
+                         'ICQ.ICQPLIB'                                +
+                         'SYS1.SCBDPENU'                              +
+                         'CSF.SCSFPNL0')
+ALLOC FI(ISPMLIB) SHR DA( +
+                         &MLIB                              /* A00 */ +
+                         'TSAS.V2.MLIB'                               +
+                         'ABJ.SABJMLIB'                               +
+                         'IDI.SIDIMLIB'                               +
+                         'FMN.SFMNMENU'                               +
+                         'GIM.SGIMMENU'                               +
+                /*       'MQM.SCSQMSGE'                            */ +
+                         'ISP.SISPMENU'                               +
+                         'EOY.SEOYBENU'                               +
+                         'EOX.SEPHMSG1'                               +
+                         'SYS1.DGTMLIB'                               +
+                         'SYS1.DFQMLIB'                               +
+                         'SYS1.SEDGMENU'                              +
+                         'SYS1.SERBMENU'                              +
+                         'EOY.SEOYMENU'                               +
+                         'SYS1.SBLSMSG0'                              +
+                         'SYS1.SBPXMENU'                              +
+                         'AOP.SAOPMENU'                               +
+                         'GDDM.SADMMSG'                               +
+                         'SYS1.HRFMSG'                                +
+                         'SYS1.SBDTMSG'                               +
+                         'ISF.SISFMLIB'                               +
+                         'TCPIP.SEZAMENU'                             +
+                         'ICQ.ICQMLIB'                                +
+                         'SYS1.SCBDMENU'                              +
+                         'ED.ISPMLIB'                       /* A00 */ +
+                         'TIV.TWS.SEQQMSG0'                           +
+                         'CSF.SCSFMSG0')
+ALLOC FI(IPCSPARM) SHR DA( +
+                         'SYS1.SHASPARM'                              +
+                         'SYS1.PARMLIB')
+ALLOC FI(ISPTLIB) SHR DA( +
+                         '&DSNAME'                                    +
+                         &TLIB                              /* A00 */ +
+                         'TSAS.V2.TLIB'                               +
+                         'ABJ.SABJTLIB'                               +
+                         'IDI.SIDITLIB'                               +
+                         'FMN.SFMNTENU'                               +
+                         'GIM.SGIMTENU'                               +
+                         'ISP.SISPTENU'                               +
+                         'EOX.SEPHTBL1'                               +
+                         'SYS1.DGTTLIB'                               +
+                         'SYS1.SERBT'                                 +
+                 /*      'MQM.SCSQTBLE'                            */ +
+                         'SYS1.SERBTENU'                             +
+                         'EOY.SEOYTENU'                              +
+                         'SYS1.SBLSTBL0'                             +
+                         'SYS1.SBPXTENU'                             +
+                         'ISF.SISFTLIB'                              +
+                         'ICQ.ICQTABLS'                              +
+                         'SYS1.SCBDTENU'                             +
+                         'ED.ISPTLIB'                       /* A00 */+
+                         'TIV.TWS.SEQQTBL0'                          +
+                         'CSF.SCSFTLIB')
+ALLOC FI(ISPSLIB) SHR DA( +
+                         &SLIB                              /* A00 */ +
+                         'TSAS.V2.SLIB'                               +
+                         'ABJ.SABJSLIB'                               +
+                         'IDI.SIDISLIB'                               +
+                         'FMN.SFMNSLIB'                               +
+                         'GIM.SGIMSENU'                               +
+                         'ISP.SISPSLIB'                               +
+                         'ISP.SISPSENU'                               +
+                         'SYS1.DGTSLIB'                               +
+                         'SYS1.SBLSKEL0'                              +
+                         'SYS1.HRFSKEL'                               +
+                         'ISF.SISFSLIB'                               +
+                         'ICQ.ICQSLIB'                                +
+                         'ED.ISPSLIB'                       /* A00 */ +
+                         'TWS.RZDGVCED.SKELS'                         +
+                         'TIV.TWS.SEQQSKL0'                           +
+                         'TIV.TWS.SEQQSAMP'                           +
+                         'CSF.SCSFSKL0')
+      ALLOC FI(EQQMLIB) SHR REUSE DA('TIV.TWS.SEQQMSG0')
+ALLOC FI(ISPILIB) SHR DA( +
+                         'ISP.SISPSAMP')
+ERROR RETURN
+PDF &PNL
