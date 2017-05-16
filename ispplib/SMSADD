@@ -14,6 +14,7 @@
 + CURRENT SYSTEMS LIST ... &SYSDS                           +
 + CURRENT DISKLIST ....... &DSKLST                          +
 + CURRENT TEMPDS ......... &TEMPDS                          +
++ CURRENT LOGDS .......... &LOGDS                           +
 +                                                           +
 +                                                           +
 )INIT
@@ -24,6 +25,8 @@
 &SYSDS='ED.SMSTOOL.SYS'
 /*&SYSDS='A09.TS'*/
 &TEMPDS='A09.TMP'
+&LOGDS='ED.SMSTOOL.LOG'
+&OPER=''
 &MODE=0
 /* MODE FOR CHECK IS DISK ENABLED. 0 - CURRENT DISKS, 1 - ANOTHER DISKS */
 )PROC
@@ -58,7 +61,7 @@ IF (VER(&GRP,NB) & VER(&VOL,NB) & &VOL NE 'NOT FOUND' & &ZCMD='A')
           &STAT = ''
           *REXX(DSKLST,ADDR,VOL,SIZE,(FADDR#))
           IF (&ADDR NE 'NOT FOUND')
-            *REXX(GRP,VOL,ADDR,SYSDS,TEMPDS)
+            *REXX(GRP,VOL,ADDR,SYSDS,SIZE,TEMPDS,LOGDS)
             SAY 'ADDRESS: 'ADDR
             SAY 'VOLUME: 'VOL
             /* run routine which generates jcl with system command 'vary' */
@@ -95,8 +98,16 @@ IF (VER(&GRP,NB) & VER(&VOL,NB) & &VOL NE 'NOT FOUND' & &ZCMD='A')
             END
             ADDRESS TSO
             "CONSOLE DEACTIVATE"
-            SAY SIZE ' GB DISK('ADDR') ADDED TO GROUP 'GRP' WITH VOL ' VOL
+            PHRASE = SIZE ' GB DISK('ADDR') ADDED TO GROUP 'GRP' WITH VOL ' VOL
+            SAY PHRASE
+            /*   "ALLOC DA('"LOGDS"') F(OUTDD) MOD REUSE"     */
+            /*   PUSH PHRASE ' BY ' USERID()                  */
+            /*   "EXECIO 1 DISKW OUTDD (FINIS"                */
+            /*   "FREE F(OUTDD)"                              */
             *ENDREXX
+            &OPER='ADD'
+            *REXX(GRP,VOL,ADDR,SIZE,LOGDS,OPER,(SMSLOG#))
+            &OPER=''
           ELSE
             *REXX(SIZE)
             SAY 'CANT FIND FREE DISK ' SIZE ' GB IN DISKLIST'
@@ -168,6 +179,9 @@ IF (VER(&GRP,NB) & VER(&VOL,NB) & &VOL NE 'NOT FOUND' & &ZCMD='D')
         "CONSOLE DEACTIVATE"
         SAY 'DISK('ADDR') DELETED FROM 'GRP
         *ENDREXX
+        &OPER='DEL'
+        *REXX(GRP,VOL,ADDR,SIZE,LOGDS,OPER,(SMSLOG#))
+        &OPER=''
   ELSE
     *REXX()
     SAY 'CANT DELETE/CREATE TEMP DATASET OR DISKLIST NOT DEFINED'

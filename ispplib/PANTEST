@@ -1,0 +1,24 @@
+)BODY
+%---------------------------  EMPLOYEE RECORDS  ------------------------------
+%COMMAND ===>_ZCMD
+%
+%EMPLOYEE SERIAL: &EMPSER
++
++   TYPE OF CHANGE%===>_TYPECHG  +  (NEW, UPDATE, OR DELETE)
++
++   EMPLOYEE NAME:
++     LAST   %===>_LNAME          +
++     FIRST  %===>_FNAME          +
++     INITIAL%===>_I+
++
++   HOME ADDRESS:
++     LINE 1 %===>_ADDR1                                    +
++     LINE 2 %===>_ADDR2                                    +
++     LINE 3 %===>_ADDR3                                    +
++     LINE 4 %===>_ADDR4                                    +
++
++   HOME PHONE:
++     AREA CODE   %===>_PHA+
++     LOCAL NUMBER%===>_PHNUM    +
++
+)END
