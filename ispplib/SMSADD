@@ -10,11 +10,14 @@
 % VOLUME .... _VOL          +
 % SIZE ...... _SIZE+ (9 27 54) default: 9+
 +                                                           +
+% SAFE DELETE..._Q+
 +                                                           +
 + CURRENT SYSTEMS LIST ... &SYSDS                           +
 + CURRENT DISKLIST ....... &DSKLST                          +
 + CURRENT TEMPDS ......... &TEMPDS                          +
 + CURRENT LOGDS .......... &LOGDS                           +
++                                                           +
++ MAXRC .... &MAXRC                                         +
 +                                                           +
 +                                                           +
 )INIT
@@ -28,14 +31,11 @@
 &LOGDS='ED.SMSTOOL.LOG'
 &OPER=''
 &MODE=0
+&Q='/'
 /* MODE FOR CHECK IS DISK ENABLED. 0 - CURRENT DISKS, 1 - ANOTHER DISKS */
 )PROC
-&ZSEL = TRANS(&ZCMD
-            A,'SMSD'
-            D,'SMSADD'
-            L,'SMSVOL'
-            F,'SMSF'
-            0,'0')
+&MAXRC=''
+&ZSEL = &ZCMD
 IF (VER (&GRP,NB) & &ZCMD='L')
   &ARGS = 'd sms,storgrp(&GRP),LISTVOL'
   *REXX(ARGS,(DIP#))
@@ -64,7 +64,7 @@ IF (VER(&GRP,NB) & VER(&VOL,NB) & &VOL NE 'NOT FOUND' & &ZCMD='A')
             *REXX(GRP,VOL,ADDR,SYSDS,SIZE,TEMPDS,LOGDS)
             SAY 'ADDRESS: 'ADDR
             SAY 'VOLUME: 'VOL
-            /* run routine which generates jcl with system command 'vary' */
+            /* RUN ROUTINE WHICH GENERATES JCL WITH SYSTEM COMMAND 'VARY' */
             CALL ALLCJCL# TEMPDS ADDR 'OFFLINE'
             /* READ DS INTO STEM */
             "ALLOC DA('"SYSDS"') F(INPUTDD) SHR REUSE"
@@ -100,13 +100,20 @@ IF (VER(&GRP,NB) & VER(&VOL,NB) & &VOL NE 'NOT FOUND' & &ZCMD='A')
             "CONSOLE DEACTIVATE"
             PHRASE = SIZE ' GB DISK('ADDR') ADDED TO GROUP 'GRP' WITH VOL ' VOL
             SAY PHRASE
-            /*   "ALLOC DA('"LOGDS"') F(OUTDD) MOD REUSE"     */
-            /*   PUSH PHRASE ' BY ' USERID()                  */
-            /*   "EXECIO 1 DISKW OUTDD (FINIS"                */
-            /*   "FREE F(OUTDD)"                              */
             *ENDREXX
             &OPER='ADD'
             *REXX(GRP,VOL,ADDR,SIZE,LOGDS,OPER,(SMSLOG#))
+            *REXX(MAXRC,OPER,(MAXRC#))
+            IF (&MAXRC > 0)
+              *REXX()
+              SAY 'Max RC > 0. Trying to restore DSKLST'
+              *ENDREXX
+              *REXX(DSKLST,VOL,STAT,ADDR,Q,OPER,(VDSKLST#))
+              IF (&STAT  = 'OK')
+                &STAT = ''
+                *REXX()
+                SAY 'DSKLST SUCCESSFULLY RESTORED'
+                *ENDREXX
             &OPER=''
           ELSE
             *REXX(SIZE)
@@ -131,9 +138,9 @@ IF (VER(&GRP,NB) & VER(&VOL,NB) & &VOL NE 'NOT FOUND' & &ZCMD='D')
     *REXX(GRP,VOL,STAT,(CHKVOL#))
     IF (&STAT  = 'OK')
       &STAT = ''
-      *REXX(DSKLST,VOL,STAT,ADDR,(VDSKLST#))
+      *REXX(DSKLST,VOL,STAT,ADDR,Q,(VDSKLST#))
       IF (&STAT  = 'OK')
-        &STAT=''
+        &STAT = ''
         *REXX(GRP,VOL,ADDR,STAT,SYSDS,TEMPDS)
         SAY VOL ' FOUND AT ' ADDR
         /* VARY OFFLINE */
@@ -181,6 +188,17 @@ IF (VER(&GRP,NB) & VER(&VOL,NB) & &VOL NE 'NOT FOUND' & &ZCMD='D')
         *ENDREXX
         &OPER='DEL'
         *REXX(GRP,VOL,ADDR,SIZE,LOGDS,OPER,(SMSLOG#))
+        *REXX(MAXRC,OPER,(MAXRC#))
+        IF (&MAXRC > 0)
+          *REXX()
+          SAY 'Max RC > 0. Trying to restore DSKLST'
+          *ENDREXX
+          *REXX(DSKLST,VOL,STAT,ADDR,Q,OPER,(VDSKLST#))
+          IF (&STAT  = 'OK')
+            &STAT = ''
+            *REXX()
+            SAY 'DSKLST SUCCESSFULLY RESTORED'
+            *ENDREXX
         &OPER=''
   ELSE
     *REXX()
@@ -191,4 +209,5 @@ FIELD(ZCMD) PANEL(HSMSADD)
 FIELD(VOL)  PANEL(HSMSADD)
 FIELD(GRP)  PANEL(HSMSADD)
 FIELD(SIZE) PANEL(HSMSADD)
+FIELD(Q)    PANEL(HSMSADD)
 )end

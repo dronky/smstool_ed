@@ -13,6 +13,9 @@
 +                                                           +
 + Delete volume:                                            +
 + 1) Specify VOL and GROUP, which you want to delete        +
++ 2) [D]elete disk.                                         +
++ If safe delete option specified, program will check is    +
++ disk exist in DSKLST                                      +
 +                                                           +
 +                                                           +
 )INIT
